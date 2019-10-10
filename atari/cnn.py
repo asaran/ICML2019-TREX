@@ -6,7 +6,7 @@ import numpy as np
 from utils import get_gaze_heatmap
 
 class Net(nn.Module):
-    def __init__(self):
+    def __init__(self, gaze_dropout, gaze_loss_type):
         super().__init__()
 
         self.conv1 = nn.Conv2d(4, 16, 7, stride=3)
@@ -16,6 +16,8 @@ class Net(nn.Module):
         self.fc1 = nn.Linear(784, 64)
         self.fc2 = nn.Linear(64, 1)
 
+        self.gaze_dropout = gaze_dropout
+		self.gaze_loss_type = gaze_loss_type
 
 
     def cum_return(self, traj):
@@ -33,7 +35,26 @@ class Net(nn.Module):
         r = self.fc2(x)
         sum_rewards += torch.sum(r)
         sum_abs_rewards += torch.sum(torch.abs(r))
-        return sum_rewards, sum_abs_rewards
+
+        # prepare conv map to be returned for gaze loss
+        conv_map_traj = []
+		conv_map_stacked = torch.tensor([[]])
+        if self.gaze_loss_type is not None:
+            # sum over all dimensions of the conv map
+            conv_map = x_final_conv.sum(dim=1)
+
+            # normalize the conv map
+            # TODO: check dims?
+            min_x = torch.min(conv_map)
+            max_x = torch.max(conv_map)
+            x_norm = (conv_map - min_x)/(max_x - min_x)
+            print('Normalizing conv maps of last layer')
+            print(min_x.shape, max_x.shape, conv_map.shape)
+            conv_map_traj.append(x_norm)
+    
+			conv_map_stacked = torch.stack(conv_map_traj)
+
+        return sum_rewards, sum_abs_rewards, conv_map_stacked
 
 
 

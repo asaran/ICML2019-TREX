@@ -6,6 +6,7 @@ import torch
 from os import path, listdir
 import gaze_heatmap as gh
 import time
+from baselines.common.trex_utils import preprocess
 
 cv2.ocl.setUseOpenCL(False)
 
@@ -343,7 +344,7 @@ def get_sorted_traj_indices(env_name, dataset):
     return demos
 
 
-def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, mask_scores):
+def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze):
     """returns an array of trajectories corresponding to what you would get running checkpoints from PPO
        demonstrations are grayscaled, maxpooled, stacks of 4 with normalized values between 0 and 1 and
        top section of screen is masked
@@ -361,7 +362,7 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, mask_sc
     #human_gaze = []
     human_gaze_26 = []
     # human_gaze_11 = []
-    # human_gaze_7 = []
+    human_gaze_7 = []
 
     # img_frames = []
     print('len demos: ',len(demos))
@@ -378,10 +379,12 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, mask_sc
         demo_norm_mask = []
         #normalize values to be between 0 and 1 and have top part masked
         for ob in stacked_traj:
-            if mask_scores:
-                demo_norm_mask.append(mask_score(normalize_state(ob), crop_top))
-            else:
-                demo_norm_mask.append(normalize_state(ob))  # currently not cropping
+            # if mask_scores:
+            #     demo_norm_mask.append(mask_score(normalize_state(ob), crop_top))
+            # else:
+            #     demo_norm_mask.append(normalize_state(ob))  # currently not cropping
+
+            demo_norm_mask.append(preprocess(ob, env_name)[0])
         human_demos.append(demo_norm_mask)
 
         # skip and stack reward
@@ -397,32 +400,32 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, mask_sc
 
             # generate gaze heatmaps as per Ruohan's algorithm
             h = gh.DatasetWithHeatmap()
-            g_26 = h.createGazeHeatmap(gaze, 26)
+            # g_26 = h.createGazeHeatmap(gaze, 26)
             # g_11 = h.createGazeHeatmap(gaze, 11)
-            # g_7 = h.createGazeHeatmap(gaze, 7)
+            g_7 = h.createGazeHeatmap(gaze, 7)
 
             # print('g type: ', type(g_11))
 
             # skip and stack gaze
-            maxed_gaze_26 = MaxSkipGaze(g_26, 26)
-            stacked_gaze_26 = CollapseGaze(maxed_gaze_26, 26)
-            human_gaze_26.append(stacked_gaze_26)
+            # maxed_gaze_26 = MaxSkipGaze(g_26, 26)
+            # stacked_gaze_26 = CollapseGaze(maxed_gaze_26, 26)
+            # human_gaze_26.append(stacked_gaze_26)
 
             # maxed_gaze_11 = MaxSkipGaze(g_11, 11)
             # stacked_gaze_11 = CollapseGaze(maxed_gaze_11, 11)
             # human_gaze_11.append(stacked_gaze_11)
 
-            # maxed_gaze_7 = MaxSkipGaze(g_7, 7)
-            # stacked_gaze_7 = CollapseGaze(maxed_gaze_7, 7)
-            # human_gaze_7.append(stacked_gaze_7)
+            maxed_gaze_7 = MaxSkipGaze(g_7, 7)
+            stacked_gaze_7 = CollapseGaze(maxed_gaze_7, 7)
+            human_gaze_7.append(stacked_gaze_7)
 
             # print('maxed gaze type: ',type(maxed_gaze_11)) #list
             # print('stacked gaze type: ',type(stacked_gaze_11)) #list
 
     if(use_gaze):    
-        print(len(human_demos[0]), len(human_rewards[0]), len(human_gaze_26[0]))
-        print(len(human_demos), len(human_rewards), len(human_gaze_26))
-    return human_demos, human_scores, human_rewards, human_gaze_26
+        print(len(human_demos[0]), len(human_rewards[0]), len(human_gaze_7[0]))
+        print(len(human_demos), len(human_rewards), len(human_gaze_7))
+    return human_demos, human_scores, human_rewards, human_gaze_7
 
 
 def read_gaze_file(game_file):

@@ -21,11 +21,12 @@ from cnn import Net
 import atari_head_dataset as ahd 
 import utils
 
-def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length):
+def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, gaze_coords, use_gaze):
     #collect training data
     max_traj_length = 0
     training_obs = []
     training_labels = []
+    training_gaze = []
     num_demos = len(demonstrations)
 
     #add full trajs (for use on Enduro)
@@ -45,6 +46,10 @@ def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_le
         traj_i = demonstrations[ti][si::step]  #slice(start,stop,step)
         traj_j = demonstrations[tj][sj::step]
         
+        if use_gaze:
+            gaze_i = gaze_coords[ti][si::step]
+            gaze_j = gaze_coords[tj][si::step]
+
         if ti > tj:
             label = 0
         else:
@@ -52,9 +57,11 @@ def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_le
         
         training_obs.append((traj_i, traj_j))
         training_labels.append(label)
+        if use_gaze:
+			training_gaze.append((gaze_i, gaze_j))
         max_traj_length = max(max_traj_length, len(traj_i), len(traj_j))
 
-
+    # TODO: why 2 for loops?
     #fixed size snippets with progress prior
     for n in range(num_snippets):
         ti = 0
@@ -79,6 +86,10 @@ def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_le
         traj_i = demonstrations[ti][ti_start:ti_start+rand_length:2] #skip everyother framestack to reduce size
         traj_j = demonstrations[tj][tj_start:tj_start+rand_length:2]
 
+        if use_gaze:
+            gaze_i = gaze_coords[ti][ti_start:ti_start+rand_length:2]
+            gaze_j = gaze_coords[tj][tj_start:tj_start+rand_length:2]
+
         max_traj_length = max(max_traj_length, len(traj_i), len(traj_j))
         if ti > tj:
             label = 0
@@ -86,23 +97,60 @@ def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_le
             label = 1
         training_obs.append((traj_i, traj_j))
         training_labels.append(label)
+        if use_gaze:
+			training_gaze.append((gaze_i, gaze_j))
 
     print("maximum traj length", max_traj_length)
-    return training_obs, training_labels
+    return training_obs, training_labels, training_gaze
 
 
+
+def get_gaze_coverage_loss(self, true_gaze, conv_gaze):
+		loss = 0
+		batch_size = true_gaze.shape[0]
+        print('batch size: ', batch_size)
+
+		# sum over all dimensions of the conv map
+		conv_gaze = conv_gaze.sum(dim=1)
+		# print(conv_gaze.shape)
+
+		# collapse and normalize the conv map
+		min_x = torch.min(torch.min(conv_gaze,dim=1)[0],dim=1)[0]
+		max_x = torch.max(torch.max(conv_gaze,dim=1)[0], dim=1)[0]
+		
+		min_x = min_x.reshape(batch_size,1).repeat(1,7).unsqueeze(-1).expand(batch_size,7,7)
+		max_x = max_x.reshape(batch_size,1).repeat(1,7).unsqueeze(-1).expand(batch_size,7,7)
+		x_norm = (conv_gaze - min_x)/(max_x - min_x)
+
+		# assert batch size for both conv and true gaze is the same
+		assert(batch_size==conv_gaze.shape[0])
+		
+        # TODO:  batch size == 1?
+		coverage_loss = torch.sum(torch.bmm(true_gaze,torch.abs(true_gaze-x_norm)))/batch_size
+
+		return coverage_loss
 
 
 
 # Train the network
-def learn_reward(reward_network, optimizer, training_inputs, training_outputs, num_iter, l1_reg, checkpoint_dir):
+def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, checkpoint_dir, gaze_loss_type, gaze_reg):
     #check if gpu available
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     # Assume that we are on a CUDA machine, then this should print a CUDA device:
     print(device)
+
+    # gaze loss
+    if gaze_loss_type=='EMD':
+		gaze_loss = gaze_loss_EMD
+	elif gaze_loss_type=='coverage':
+		gaze_loss = gaze_loss_coverage
+	elif gaze_loss_type=='KL':
+		gaze_loss = gaze_loss_KL
+
     loss_criterion = nn.CrossEntropyLoss()
     
     cum_loss = 0.0
+    training_inputs, training_outputs, training_gaze7 = training_data
     training_data = list(zip(training_inputs, training_outputs))
     for epoch in range(num_iter):
         np.random.shuffle(training_data)
@@ -122,7 +170,24 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
             #forward + backward + optimize
             outputs, abs_rewards = reward_network.forward(traj_i, traj_j)
             outputs = outputs.unsqueeze(0)
-            loss = loss_criterion(outputs, labels) + l1_reg * abs_rewards
+            output_loss = loss_criterion(outputs, labels)
+
+            if gaze_loss_type is None:
+				loss = output_loss + l1_reg * abs_rewards
+            elif gaze_loss_type=='coverage':
+                # ground truth human gaze maps (7x7)
+				gaze7_i, gaze7_j = training_gaze7[i]
+                # TODO: gaze7_i, gaze7_j are tensors?
+                print(type(gaze7_i))
+
+                gaze_loss_i = gaze_loss(gaze7_i, conv_map_i)
+				gaze_loss_j = gaze_loss(gaze7_j, conv_map_j)
+
+                gaze_loss_total = (gaze_loss_i + gaze_loss_j)
+                print('gaze loss: ', gaze_loss_total.data)    
+
+                loss = output_loss + l1_reg * abs_rewards + gaze_reg * gaze_loss_total
+
             loss.backward()
             optimizer.step()
 
@@ -250,7 +315,7 @@ if __name__=="__main__":
     # Use Atari-HEAD human demos
     data_dir = args.data_dir
 	dataset = ahd.AtariHeadDataset(env_name, data_dir)
-	demonstrations, learning_returns, learning_rewards, learning_gaze26 = utils.get_preprocessed_trajectories(env_name, dataset, data_dir, gaze_dropout)
+	demonstrations, learning_returns, learning_rewards, learning_gaze7 = utils.get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze)
 
 
     #sort the demonstrations according to ground truth reward to simulate ranked demos
@@ -269,8 +334,8 @@ if __name__=="__main__":
     sorted_returns = sorted(learning_returns)
     print(sorted_returns)
     
-    training_data = create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, learning_gaze26, gaze_dropout)
-    training_obs, training_labels, training_gaze26 = training_data
+    training_data = create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, learning_gaze7, use_gaze)
+    training_obs, training_labels, training_gaze7 = training_data
     print("num training_obs", len(training_obs))
     print("num_labels", len(training_labels))
    
