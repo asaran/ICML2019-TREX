@@ -19,7 +19,9 @@ class AtariHeadDataset():
         self.env_name = env_name
 
         #check that the we have the trajs where expected
+        print(self.trajs_path)
         assert path.exists(self.trajs_path)
+        
 
         self.trajectories = self.load_trajectories()
         # print((self.trajectories['seaquest'].keys()))
