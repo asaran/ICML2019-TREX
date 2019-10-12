@@ -48,10 +48,16 @@ class DatasetWithHeatmap:
             self.GHmap = scipy.ndimage.zoom(self.GHmap, (1, 0.5, 0.5, 1))
 
         # print("Normalizing the heat map...")
+        #for i in range(len(self.GHmap)):
+        #    SUM = self.GHmap[i].sum()
+        #    if SUM != 0:
+        #        self.GHmap[i] /= SUM
+
         for i in range(len(self.GHmap)):
-            SUM = self.GHmap[i].sum()
-            if SUM != 0:
-                self.GHmap[i] /= SUM
+            max_val = self.GHmap[i].max()
+            min_val = self.GHmap[i].min()
+            if max_val!=min_val:
+                self.GHmap[i] = (self.GHmap[i] - min_val)/(max_val - min_val)
 
         # print("Done. BIU.convert_gaze_pos_to_heap_map() and convolution used: %.1fs" % (time.time()-t1))
         # print(type(self.GHmap))
