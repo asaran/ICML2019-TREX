@@ -226,7 +226,7 @@ def calc_accuracy(reward_network, training_inputs, training_outputs):
             traj_j = torch.from_numpy(traj_j).float().to(device)
 
             #forward to get logits
-            outputs, abs_return = reward_network.forward(traj_i, traj_j)
+            outputs, abs_return, _, _ = reward_network.forward(traj_i, traj_j)
             _, pred_label = torch.max(outputs,0)
             if pred_label.item() == label:
                 num_correct += 1.
@@ -363,6 +363,6 @@ if __name__=="__main__":
     for i, p in enumerate(pred_returns):
         print(i,p,sorted_returns[i])
 
-    print("accuracy", calc_accuracy(reward_net, training_obs, training_labels, training_gaze26, gaze_dropout))
+    print("accuracy", calc_accuracy(reward_net, training_obs, training_labels))
 
     
