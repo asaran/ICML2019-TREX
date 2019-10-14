@@ -48,7 +48,7 @@ def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_le
         
         if use_gaze:
             gaze_i = gaze_coords[ti][si::step]
-            gaze_j = gaze_coords[tj][si::step]
+            gaze_j = gaze_coords[tj][sj::step]
 
         if ti > tj:
             label = 0
@@ -101,32 +101,22 @@ def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_le
             training_gaze.append((gaze_i, gaze_j))
 
     print("maximum traj length", max_traj_length)
+    print(len(training_labels), len(training_obs), len(training_gaze))
+    #exit(0)
     return training_obs, training_labels, training_gaze
 
 
 
-def get_gaze_coverage_loss(self, true_gaze, conv_gaze):
+def get_gaze_coverage_loss(true_gaze, conv_gaze):
         loss = 0
         batch_size = true_gaze.shape[0]
-        print('batch size: ', batch_size)
-
-        # sum over all dimensions of the conv map
-        conv_gaze = conv_gaze.sum(dim=1)
-        # print(conv_gaze.shape)
-
-        # collapse and normalize the conv map
-        min_x = torch.min(torch.min(conv_gaze,dim=1)[0],dim=1)[0]
-        max_x = torch.max(torch.max(conv_gaze,dim=1)[0], dim=1)[0]
-        
-        min_x = min_x.reshape(batch_size,1).repeat(1,7).unsqueeze(-1).expand(batch_size,7,7)
-        max_x = max_x.reshape(batch_size,1).repeat(1,7).unsqueeze(-1).expand(batch_size,7,7)
-        x_norm = (conv_gaze - min_x)/(max_x - min_x)
+        #print('batch size: ', batch_size)
 
         # assert batch size for both conv and true gaze is the same
         assert(batch_size==conv_gaze.shape[0])
         
-        # TODO:  batch size == 1?
-        coverage_loss = torch.sum(torch.bmm(true_gaze,torch.abs(true_gaze-x_norm)))/batch_size
+        #print(conv_gaze.is_cuda, true_gaze.is_cuda)
+        coverage_loss = torch.sum(torch.bmm(true_gaze,torch.abs(true_gaze-conv_gaze)))/batch_size
 
         return coverage_loss
 
@@ -139,24 +129,18 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
     # Assume that we are on a CUDA machine, then this should print a CUDA device:
     print(device)
 
-    # gaze loss
-    if gaze_loss_type=='EMD':
-        gaze_loss = gaze_loss_EMD
-    elif gaze_loss_type=='coverage':
-        gaze_loss = gaze_loss_coverage
-    elif gaze_loss_type=='KL':
-        gaze_loss = gaze_loss_KL
-
     loss_criterion = nn.CrossEntropyLoss()
     
     cum_loss = 0.0
     training_inputs, training_outputs, training_gaze7 = training_data
-    training_data = list(zip(training_inputs, training_outputs))
+    #print(len(training_inputs[0][0]), len(training_inputs[0][1]), len(training_gaze7[0][0]), len(training_gaze7[0][1]))
+    training_data = list(zip(training_inputs, training_outputs, training_gaze7))
     for epoch in range(num_iter):
         np.random.shuffle(training_data)
-        training_obs, training_labels = zip(*training_data)
+        training_obs, training_labels, training_gaze7 = zip(*training_data)
         for i in range(len(training_labels)):
             traj_i, traj_j = training_obs[i]
+            #print(len(traj_i), len(traj_j))
             labels = np.array([training_labels[i]])
             traj_i = np.array(traj_i)
             traj_j = np.array(traj_j)
@@ -176,6 +160,7 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
             outputs = outputs.unsqueeze(0)
             output_loss = loss_criterion(outputs, labels)
 
+            #print('gaze_loss_type: ',gaze_loss_type)
             if gaze_loss_type!='coverage':
                 loss = output_loss + l1_reg * abs_rewards
 
@@ -183,13 +168,16 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
                 # ground truth human gaze maps (7x7)
                 gaze7_i, gaze7_j = training_gaze7[i]
                 # TODO: gaze7_i, gaze7_j are tensors?
-                print(type(gaze7_i))
+                #print(type(gaze7_i), type(gaze7_i[0]))
+                gaze7_i = torch.squeeze(torch.tensor(gaze7_i, device=device)) # list of torch tensors
+                gaze7_j = torch.squeeze(torch.tensor(gaze7_j, device=device))
+                #print(i,type(gaze7_i), gaze7_i.size(), torch.squeeze(conv_map_i).size(), traj_i.size())
 
-                gaze_loss_i = gaze_loss(gaze7_i, conv_map_i)
-                gaze_loss_j = gaze_loss(gaze7_j, conv_map_j)
+                gaze_loss_i = get_gaze_coverage_loss(gaze7_i, torch.squeeze(conv_map_i))
+                gaze_loss_j = get_gaze_coverage_loss(gaze7_j, torch.squeeze(conv_map_j))
 
                 gaze_loss_total = (gaze_loss_i + gaze_loss_j)
-                print('gaze loss: ', gaze_loss_total.data)    
+                #print('gaze loss: ', gaze_loss_total.data)    
 
                 loss = output_loss + l1_reg * abs_rewards + gaze_reg * gaze_loss_total
 
@@ -231,9 +219,6 @@ def calc_accuracy(reward_network, training_inputs, training_outputs):
             if pred_label.item() == label:
                 num_correct += 1.
     return num_correct / len(training_inputs)
-
-
-
 
 
 
@@ -336,11 +321,18 @@ if __name__=="__main__":
     demonstrations = [x for _, x in sorted(zip(learning_returns,demonstrations), key=lambda pair: pair[0])]
     learning_gaze7 = [x for _, x in sorted(zip(learning_returns,learning_gaze7), key=lambda pair: pair[0])]
 
+    #print([len(x) for x in demonstrations], [len(y) for y in learning_gaze7])
+    #exit(0)
+
     sorted_returns = sorted(learning_returns)
     print(sorted_returns)
     
     training_data = create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, learning_gaze7, use_gaze)
     training_obs, training_labels, training_gaze7 = training_data
+
+    print(len(training_obs[0][0]), len(training_obs[0][1]), len(training_gaze7[0][0]), len(training_gaze7[0][1])) 
+    #exit(0)
+
     print("num training_obs", len(training_obs))
     print("num_labels", len(training_labels))
    
@@ -350,7 +342,7 @@ if __name__=="__main__":
     reward_net.to(device)
     import torch.optim as optim
     optimizer = optim.Adam(reward_net.parameters(),  lr=lr, weight_decay=weight_decay)
-    learn_reward(reward_net, optimizer, training_data, num_iter, l1_reg, args.reward_model_path, gaze_dropout, gaze_reg)
+    learn_reward(reward_net, optimizer, training_data, num_iter, l1_reg, args.reward_model_path, gaze_loss_type, gaze_reg)
     torch.cuda.empty_cache() 
 
 
