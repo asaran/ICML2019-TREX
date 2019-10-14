@@ -132,12 +132,19 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
     loss_criterion = nn.CrossEntropyLoss()
     
     cum_loss = 0.0
+ 
     training_inputs, training_outputs, training_gaze7 = training_data
     #print(len(training_inputs[0][0]), len(training_inputs[0][1]), len(training_gaze7[0][0]), len(training_gaze7[0][1]))
-    training_data = list(zip(training_inputs, training_outputs, training_gaze7))
+    if gaze_loss_type=='coverage':
+        training_data = list(zip(training_inputs, training_outputs, training_gaze7))
+    else:
+        training_data = list(zip(training_inputs, training_outputs))
     for epoch in range(num_iter):
         np.random.shuffle(training_data)
-        training_obs, training_labels, training_gaze7 = zip(*training_data)
+        if gaze_loss_type=='coverage':
+            training_obs, training_labels, training_gaze7 = zip(*training_data)
+        else:
+            training_obs, training_labels = zip(*training_data)
         for i in range(len(training_labels)):
             traj_i, traj_j = training_obs[i]
             #print(len(traj_i), len(traj_j))
@@ -330,7 +337,7 @@ if __name__=="__main__":
     training_data = create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, learning_gaze7, use_gaze)
     training_obs, training_labels, training_gaze7 = training_data
 
-    print(len(training_obs[0][0]), len(training_obs[0][1]), len(training_gaze7[0][0]), len(training_gaze7[0][1])) 
+    #print(len(training_obs[0][0]), len(training_obs[0][1]), len(training_gaze7[0][0]), len(training_gaze7[0][1])) 
     #exit(0)
 
     print("num training_obs", len(training_obs))
