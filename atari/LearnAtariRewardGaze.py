@@ -256,7 +256,7 @@ if __name__=="__main__":
     parser.add_argument('--gaze_reg', default=0.01, help="gaze loss multiplier")
     # parser.add_argument('--metric', default='rewards', help="metric to compare paired trajectories performance: rewards or returns")
     parser.add_argument('--gaze_dropout', default=False, action='store_true', help="use gaze modulated dropout or not")
-
+    parser.add_argument('--motion', default=False, action='store_true', help="use motion as ground truth gaze")
 
     args = parser.parse_args()
     env_name = args.env_name
