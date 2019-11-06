@@ -6,7 +6,7 @@ import torch
 from os import path, listdir
 import gaze_heatmap as gh
 import time
-from baselines.common.trex_utils import preprocess
+from baselines.common.trex_utils import preprocess # TODO: add masking part for extra games
 
 cv2.ocl.setUseOpenCL(False)
 
@@ -87,6 +87,18 @@ def StackFrames(frames):
             stacked.append(np.expand_dims(copy.deepcopy(stacked_obs),0))
     return stacked
 
+
+def get_motion_maps(stacked_traj):
+    stacked_motion = []
+    for stack in stacked_traj:
+        motion_frame = stack[:,:,3] - stack[:,:,0]
+
+        # normalize motion map
+        
+        max_motion, min_motion = np.amax(stacked_obs), np.amin(stacked_obs)
+        motion_map = (motion_map - min_motion)/(max_motion-min_motion)
+        stacked_motion.append(motion_frame)
+    return stacked_motion
 
 def CreateGazeMap(gaze_coords, pic):
     import math
@@ -207,7 +219,8 @@ def CollapseGazeHeatmaps(maxed_gaze, heatmap_size):
             stacked_obs = stacked_obs + maxed_gaze[i-1]
             stacked_obs = stacked_obs + maxed_gaze[i]
 
-            # Normalize the gaze mask
+            # Normalize the gaze mask 
+            # TODO: subtract by the min to get values between 0 & 1?
             max_gaze_freq = np.amax(stacked_obs)
             stacked_obs = normalize(stacked_obs, max_gaze_freq)
 
@@ -282,6 +295,9 @@ def StackReward(rewards):
 
             stacked.append(np.expand_dims(copy.deepcopy(stacked_obs),0))
     return stacked
+
+
+
 
 def get_sorted_traj_indices(env_name, dataset):
     #need to pick out a subset of demonstrations based on desired performance
@@ -360,11 +376,7 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, gaze_co
     human_demos = []
     human_rewards = []
     human_gaze = []
-    # human_gaze_26 = []
-    # human_gaze_11 = []
-    # human_gaze_7 = []
-
-    # img_frames = []
+   
     print('len demos: ',len(demos))
     for indx, score, img_dir, rew, gaze, frame in demos:
         print(indx)
@@ -392,7 +404,11 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, gaze_co
         stacked_reward = StackReward(maxed_reward)      
         human_rewards.append(stacked_reward)
 
-        if(use_gaze):
+        if use_motion:
+            stacked_motion = get_motion_maps(stacked_traj)
+            human_gaze.append(stacked_motion)
+
+        elif use_gaze:
             # just return the gaze coordinates themselves
             # skipped_gaze = SkipGazeCoords(gaze)
             # stacked_gaze = StackGazeCoords(skipped_gaze)
@@ -416,8 +432,6 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, gaze_co
                 exit(1)
             g = h.createGazeHeatmap(gaze, conv_size)
 
-            # print('g type: ', type(g_11))
-
             # skip and stack gaze
             # maxed_gaze_26 = MaxSkipGaze(g_26, 26)
             # stacked_gaze_26 = CollapseGaze(maxed_gaze_26, 26)
@@ -433,6 +447,7 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, gaze_co
 
             # print('maxed gaze type: ',type(maxed_gaze_11)) #list
             # print('stacked gaze type: ',type(stacked_gaze_11)) #list
+
 
     if(use_gaze):    
         print(len(human_demos[0]), len(human_rewards[0]), len(human_gaze[0]))

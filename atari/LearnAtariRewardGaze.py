@@ -336,6 +336,7 @@ if __name__=="__main__":
 
     parser.add_argument('--data_dir', help="where atari-head data is located")
     parser.add_argument('--gaze_loss', default=None, type=str, help="type of gaze loss function: sinkhorn, exact, coverage, KL, None")
+    parser.add_argument('--motion_loss', default=None, type=str, help="type of motion loss function: sinkhorn, exact, coverage, KL, None")
     parser.add_argument('--gaze_reg', default=0.01, type=float, help="gaze loss multiplier")
     # parser.add_argument('--metric', default='rewards', help="metric to compare paired trajectories performance: rewards or returns")
     parser.add_argument('--gaze_dropout', default=False, action='store_true', help="use gaze modulated dropout or not")
@@ -376,6 +377,7 @@ if __name__=="__main__":
     stochastic = True
 
     # gaze-related arguments
+    use_motion = args.motion
     use_gaze = args.gaze_dropout or (args.gaze_loss is not None)
     gaze_loss_type = args.gaze_loss
     gaze_reg = args.gaze_reg
@@ -383,8 +385,6 @@ if __name__=="__main__":
     gaze_conv_layer = args.gaze_conv_layer
     gaze_dropout = args.gaze_dropout
     print('*************** GAZE: ',use_gaze,'****************')
-
-    
 
     env = make_vec_env(env_id, 'atari', 1, seed,
                        wrapper_kwargs={
@@ -400,8 +400,11 @@ if __name__=="__main__":
     # Use Atari-HEAD human demos
     data_dir = args.data_dir
     dataset = ahd.AtariHeadDataset(env_name, data_dir)
-    demonstrations, learning_returns, learning_rewards, learning_gaze = utils.get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, gaze_conv_layer)
+    demonstrations, learning_returns, learning_rewards, learning_gaze = utils.get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, gaze_conv_layer, use_motion)
 
+    if use_motion:
+        use_gaze=True
+        gaze_loss_type = args.motion_loss
 
     #sort the demonstrations according to ground truth reward to simulate ranked demos
     demo_lengths = [len(d) for d in demonstrations]
