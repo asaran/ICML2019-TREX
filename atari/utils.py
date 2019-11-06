@@ -344,7 +344,7 @@ def get_sorted_traj_indices(env_name, dataset):
     return demos
 
 
-def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze):
+def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, gaze_conv_layer):
     """returns an array of trajectories corresponding to what you would get running checkpoints from PPO
        demonstrations are grayscaled, maxpooled, stacks of 4 with normalized values between 0 and 1 and
        top section of screen is masked
@@ -359,10 +359,10 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze):
     human_scores = []
     human_demos = []
     human_rewards = []
-    #human_gaze = []
-    human_gaze_26 = []
+    human_gaze = []
+    # human_gaze_26 = []
     # human_gaze_11 = []
-    human_gaze_7 = []
+    # human_gaze_7 = []
 
     # img_frames = []
     print('len demos: ',len(demos))
@@ -402,7 +402,19 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze):
             h = gh.DatasetWithHeatmap()
             # g_26 = h.createGazeHeatmap(gaze, 26)
             # g_11 = h.createGazeHeatmap(gaze, 11)
-            g_7 = h.createGazeHeatmap(gaze, 7)
+
+            if gaze_conv_layer==1:
+                conv_size = 26
+            elif gaze_conv_layer==2:
+                conv_size=11
+            elif gaze_conv_layer==3:
+                conv_size=9
+            elif gaze_conv_layer==4:
+                conv_size = 7
+            else:
+                print('Invalid Gaze conv layer. Must be between 1-4.')
+                exit(1)
+            g = h.createGazeHeatmap(gaze, conv_size)
 
             # print('g type: ', type(g_11))
 
@@ -415,17 +427,17 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze):
             # stacked_gaze_11 = CollapseGaze(maxed_gaze_11, 11)
             # human_gaze_11.append(stacked_gaze_11)
 
-            maxed_gaze_7 = MaxSkipGaze(g_7, 7)
-            stacked_gaze_7 = CollapseGaze(maxed_gaze_7, 7)
-            human_gaze_7.append(stacked_gaze_7)
+            maxed_gaze = MaxSkipGaze(g, conv_size)
+            stacked_gaze = CollapseGaze(maxed_gaze, conv_size)
+            human_gaze.append(stacked_gaze)
 
             # print('maxed gaze type: ',type(maxed_gaze_11)) #list
             # print('stacked gaze type: ',type(stacked_gaze_11)) #list
 
     if(use_gaze):    
-        print(len(human_demos[0]), len(human_rewards[0]), len(human_gaze_7[0]))
-        print(len(human_demos), len(human_rewards), len(human_gaze_7))
-    return human_demos, human_scores, human_rewards, human_gaze_7
+        print(len(human_demos[0]), len(human_rewards[0]), len(human_gaze[0]))
+        print(len(human_demos), len(human_rewards), len(human_gaze))
+    return human_demos, human_scores, human_rewards, human_gaze
 
 
 def read_gaze_file(game_file):
