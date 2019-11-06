@@ -20,7 +20,7 @@ class Net(nn.Module):
         self.gaze_loss_type = gaze_loss_type
 
 
-    def cum_return(self, traj, gaze_conv_layer):
+    def cum_return(self, traj, gaze_conv_layer=0):
         '''calculate cumulative return of trajectory'''
         sum_rewards = 0
         sum_abs_rewards = 0
@@ -53,7 +53,7 @@ class Net(nn.Module):
             gaze_size = 7
         else:
             print('invalid gaze_conv_layer. Must be between 1-4.')
-            exit(0)
+            #exit(0)
 
         if self.gaze_loss_type is not None:
             # sum over all dimensions of the conv map
