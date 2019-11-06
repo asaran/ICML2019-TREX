@@ -327,7 +327,7 @@ if __name__=="__main__":
     parser.add_argument('--num_snippets', default = 6000, type = int, help = "number of short subtrajectories to sample")
 
     parser.add_argument('--data_dir', help="where atari-head data is located")
-    parser.add_argument('--gaze_loss', default=None, type=str, help="type of gaze loss function: EMD, coverage, KD, None")
+    parser.add_argument('--gaze_loss', default=None, type=str, help="type of gaze loss function: sinkhorn, exact, coverage, KL, None")
     parser.add_argument('--gaze_reg', default=0.01, type=float, help="gaze loss multiplier")
     # parser.add_argument('--metric', default='rewards', help="metric to compare paired trajectories performance: rewards or returns")
     parser.add_argument('--gaze_dropout', default=False, action='store_true', help="use gaze modulated dropout or not")
