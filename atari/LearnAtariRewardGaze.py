@@ -128,10 +128,12 @@ def get_gaze_quadratic_coverage_loss(true_gaze, conv_gaze):
     assert(batch_size==conv_gaze.shape[0])
     
     #add epsilon=1e-10 to denominator for regularized KL
-    epsilon = torch.ones(conv_gaze.shape, dtype=torch.float64) * 1e-10
-    conv_gaze = conv_gaze + torch.where(x>0,-1*epsilon, epsilon)
+    epsilon = torch.ones(conv_gaze.shape, dtype=torch.double) * 1e-10
+    epsilon = epsilon.to('cpu')
+    conv_gaze = conv_gaze.double().to('cpu')
+    conv_gaze = conv_gaze + torch.where(conv_gaze>0,-1*epsilon, epsilon)
 
-    div = torch.addcdiv(torch.zeros(true_gaze.shape), 1, true_gaze.to('cpu'), conv_gaze.to('cpu'), out=None) #point wise division
+    div = torch.addcdiv(torch.zeros(true_gaze.shape), 1, true_gaze.to('cpu'), conv_gaze.float().to('cpu'), out=None) #point wise division
     quadratic = div * div
     loss = torch.sum(torch.bmm(true_gaze, quadratic.to('cuda')))/batch_size
     return loss
@@ -147,10 +149,13 @@ def get_gaze_KL_loss(true_gaze, conv_gaze):
 
     #add epsilon=1e-10 to denominator for regularized KL
     epsilon = torch.ones(conv_gaze.shape, dtype=torch.float64) * 1e-10
-    conv_gaze = conv_gaze + torch.where(x>0,-1*epsilon, epsilon)
+    epsilon = epsilon.to('cpu')
+    conv_gaze = conv_gaze.double().to('cpu')
+    conv_gaze = conv_gaze + torch.where(conv_gaze>0,-1*epsilon, epsilon)
+    true_gaze = true_gaze.double().to('cpu')
 
     loss = F.kl_div(true_gaze, conv_gaze)		
-	return loss
+    return loss.float().to('cuda')
     
 
 # differentiable approximation of Earth Mover's Distance
@@ -177,9 +182,12 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
     print(device)
     
     import os
-    if not os.path.isdir(checkpoint_dir+'/tb'):
-        os.mkdir(checkpoint_dir+'/tb')
-    writer = SummaryWriter(checkpoint_dir+'/tb')
+    from pathlib import Path
+    if not os.path.isdir(checkpoint_dir+'_tb'):
+        #path = Path(checkpoint_dir+'/tb')
+        os.makedirs(checkpoint_dir+'_tb')
+        #path.mkdir(parents=True)
+    writer = SummaryWriter(checkpoint_dir+'_tb')
     
     loss_criterion = nn.CrossEntropyLoss()
     cum_loss = 0.0
@@ -223,7 +231,7 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
             loss = output_loss + l1_reg * abs_rewards
             writer.add_scalar('CE_loss', loss.item(), epoch)
 
-            elif gaze_loss_type in ['sinkhorn', 'quadratic', 'KL', 'exact']:
+            if gaze_loss_type in ['sinkhorn', 'quadratic', 'KL', 'exact']:
                 # ground truth human gaze maps (7x7)
                 gaze_i, gaze_j = training_gaze[i]
                 # TODO: gaze_i, gaze_j are tensors?
@@ -238,31 +246,31 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
 
                     gaze_loss_total = (gaze_loss_i + gaze_loss_j)
                     #print('gaze loss: ', gaze_loss_total.data)  
-                    self.writer.add_scalar('quadratic_coverage_loss', gaze_loss_total.item(), epoch) 
+                    writer.add_scalar('quadratic_coverage_loss', gaze_loss_total.item(), epoch) 
 
                 elif gaze_loss_type == 'sinkhorn':
                     gaze_loss_i = get_gaze_sinkhorn_loss(gaze_i, torch.squeeze(conv_map_i))
                     gaze_loss_j = get_gaze_sinkhorn_loss(gaze_j, torch.squeeze(conv_map_j))
 
                     gaze_loss_total = (gaze_loss_i + gaze_loss_j)
-                    self.writer.add_scalar('sinkhorn_loss', gaze_loss_total.item(), epoch) 
+                    writer.add_scalar('sinkhorn_loss', gaze_loss_total.item(), epoch) 
 
                 if gaze_loss_type == 'KL':
                     gaze_loss_i = get_gaze_KL_loss(gaze_i, torch.squeeze(conv_map_i))
                     gaze_loss_j = get_gaze_KL_loss(gaze_j, torch.squeeze(conv_map_j))
 
                     gaze_loss_total = (gaze_loss_i + gaze_loss_j)
-                    self.writer.add_scalar('KL_loss', gaze_loss_total.item(), epoch) 
+                    writer.add_scalar('KL_loss', gaze_loss_total.item(), epoch) 
 
                 if gaze_loss_type == 'exact':
                     gaze_loss_i = get_gaze_exact_loss(gaze_i, torch.squeeze(conv_map_i))
                     gaze_loss_j = get_gaze_exact_loss(gaze_j, torch.squeeze(conv_map_j))
 
                     gaze_loss_total = (gaze_loss_i + gaze_loss_j)  
-                    self.writer.add_scalar('exact_match_loss', gaze_loss_total.item(), epoch)  
+                    writer.add_scalar('exact_match_loss', gaze_loss_total.item(), epoch)  
 
                 loss += gaze_reg * gaze_loss_total
-                self.writer.add_scalar('total_loss', loss.item(), epoch)
+                writer.add_scalar('total_loss', loss.item(), epoch)
 
             loss.backward()
             optimizer.step()
@@ -405,7 +413,7 @@ if __name__=="__main__":
     print(len(demonstrations))
     print([a[0] for a in zip(learning_returns, demonstrations)])
     demonstrations = [x for _, x in sorted(zip(learning_returns,demonstrations), key=lambda pair: pair[0])]
-    learning_gaze7 = [x for _, x in sorted(zip(learning_returns,learning_gaze7), key=lambda pair: pair[0])]
+    learning_gaze = [x for _, x in sorted(zip(learning_returns,learning_gaze), key=lambda pair: pair[0])]
 
     #print([len(x) for x in demonstrations], [len(y) for y in learning_gaze7])
     #exit(0)
@@ -413,8 +421,8 @@ if __name__=="__main__":
     sorted_returns = sorted(learning_returns)
     print(sorted_returns)
     
-    training_data = create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, learning_gaze7, use_gaze)
-    training_obs, training_labels, training_gaze7 = training_data
+    training_data = create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, learning_gaze, use_gaze)
+    training_obs, training_labels, training_gaze = training_data
 
     #print(len(training_obs[0][0]), len(training_obs[0][1]), len(training_gaze7[0][0]), len(training_gaze7[0][1])) 
     #exit(0)
@@ -438,7 +446,7 @@ if __name__=="__main__":
     #print out predicted cumulative returns and actual returns
     with torch.no_grad():
         pred_returns = [predict_traj_return(reward_net, traj) for traj in demonstrations]
-    for i, p in enumerate(pred_returns):
+    for i, p, _ in enumerate(pred_returns):
         print(i,p,sorted_returns[i])
 
     print("accuracy", calc_accuracy(reward_net, training_obs, training_labels))
