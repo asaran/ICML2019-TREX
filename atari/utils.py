@@ -88,17 +88,64 @@ def StackFrames(frames):
     return stacked
 
 
-def get_motion_maps(stacked_traj):
+def get_motion_maps(stacked_traj, heatmap_shape):
     stacked_motion = []
     for stack in stacked_traj:
-        motion_frame = stack[:,:,3] - stack[:,:,0]
+        motion_frame = stack[:,:,:,3] - stack[:,:,:,0] #1,84,84,4
 
-        # normalize motion map
-        
-        max_motion, min_motion = np.amax(stacked_obs), np.amin(stacked_obs)
-        motion_map = (motion_map - min_motion)/(max_motion-min_motion)
+        # TODO: blur motion map
+        motion_frame = BlurMotionMap(motion_frame, heatmap_shape)
+
+        # normalize motion map       
+        max_motion, min_motion = np.amax(motion_frame), np.amin(motion_frame)
+        if (max_motion-min_motion)>0:
+            motion_frame = (motion_frame - min_motion)/(max_motion-min_motion)
+
         stacked_motion.append(motion_frame)
     return stacked_motion
+
+def BlurMotionMap(motion_map, heatmap_shape):
+
+    motion_map = np.expand_dims(motion_map, axis=3)
+
+    xSCALE, ySCALE = 6, 3 # was 6,3
+    SCR_W, SCR_H = 160*xSCALE, 210*ySCALE
+    sigmaH = 28.50 * heatmap_shape / SCR_H
+    sigmaW = 44.58 * heatmap_shape / SCR_W
+    bg_prob_density = 0
+
+    from IPython import embed
+    from scipy.stats import multivariate_normal
+    import tensorflow as tf, keras as K # don't move this to the top, as people who import this file might not have keras or tf
+
+    model = K.models.Sequential()
+
+    model.add(K.layers.Lambda(lambda x: x+bg_prob_density, input_shape=(motion_map.shape[1],motion_map.shape[2],1)))
+
+    if sigmaH > 1 and sigmaW > 1: # was 0,0; if too small don't blur #TODO
+        lh, lw = int(4*sigmaH), int(4*sigmaW)
+        x, y = np.mgrid[-lh:lh+1:1, -lw:lw+1:1] # so the kernel size is [lh*2+1,lw*2+1]
+        pos = np.dstack((x, y))
+        gkernel=multivariate_normal.pdf(pos,mean=[0,0],cov=[[sigmaH*sigmaH,0],[0,sigmaW*sigmaW]])
+        assert gkernel.sum() > 0.95, "Simple sanity check: prob density should add up to nearly 1.0"
+
+        model.add(K.layers.Lambda(lambda x: tf.pad(x,[(0,0),(lh,lh),(lw,lw),(0,0)],'REFLECT')))
+        model.add(K.layers.Conv2D(1, kernel_size=gkernel.shape, strides=1, padding="valid", use_bias=False,
+              activation="linear", kernel_initializer=K.initializers.Constant(gkernel)))
+    else:
+        print ("WARNING: Gaussian filter's sigma is 0, i.e. no blur.")
+    
+    model.compile(optimizer='rmsprop', # not used
+          loss='categorical_crossentropy', # not used
+          metrics=None)
+    output=model.predict(motion_map) #, batch_size=500
+    
+    shape_before, shape_after = motion_map.shape, output.shape
+    assert shape_before == shape_after, """
+    Simple sanity check: shape changed after preprocessing. 
+    Your preprocessing code might be wrong. Check the shape of output tensor of your tensorflow code above"""
+    return output
+
 
 def CreateGazeMap(gaze_coords, pic):
     import math
@@ -360,7 +407,7 @@ def get_sorted_traj_indices(env_name, dataset):
     return demos
 
 
-def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, gaze_conv_layer):
+def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, gaze_conv_layer, use_motion):
     """returns an array of trajectories corresponding to what you would get running checkpoints from PPO
        demonstrations are grayscaled, maxpooled, stacks of 4 with normalized values between 0 and 1 and
        top section of screen is masked
@@ -405,7 +452,18 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, gaze_co
         human_rewards.append(stacked_reward)
 
         if use_motion:
-            stacked_motion = get_motion_maps(stacked_traj)
+            if gaze_conv_layer==1:
+                conv_size = 26
+            elif gaze_conv_layer==2:
+                conv_size=11
+            elif gaze_conv_layer==3:
+                conv_size=9
+            elif gaze_conv_layer==4:
+                conv_size = 7
+            else:
+                print('Invalid Gaze conv layer. Must be between 1-4.')
+                exit(1)
+            stacked_motion = get_motion_maps(stacked_traj, conv_size)
             human_gaze.append(stacked_motion)
 
         elif use_gaze:
