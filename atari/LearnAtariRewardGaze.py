@@ -151,8 +151,11 @@ def get_gaze_KL_loss(true_gaze, conv_gaze):
     epsilon = torch.ones(conv_gaze.shape, dtype=torch.float64) * 1e-10
     epsilon = epsilon.to('cpu')
     conv_gaze = conv_gaze.double().to('cpu')
+    # TODO: count ,zero, non-zero elements per feature map and gaze map. Divide epsilon and multiply epsilon with that value.
     conv_gaze = conv_gaze + torch.where(conv_gaze>0,-1*epsilon, epsilon)
     true_gaze = true_gaze.double().to('cpu')
+
+    # TODO: add epsilon to gaze map as well. 
 
     loss = F.kl_div(true_gaze, conv_gaze)		
     return loss.float().to('cuda')
