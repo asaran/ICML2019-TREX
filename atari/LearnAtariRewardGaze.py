@@ -321,6 +321,7 @@ def predict_reward_sequence(net, traj):
     with torch.no_grad():
         for s in traj:
             r = net.cum_return(torch.from_numpy(np.array([s])).float().to(device))[0].item()
+            print('output of net.cum_return: ',r)
             rewards_from_obs.append(r)
     return rewards_from_obs
 
@@ -452,7 +453,7 @@ if __name__=="__main__":
     #print out predicted cumulative returns and actual returns
     with torch.no_grad():
         pred_returns = [predict_traj_return(reward_net, traj) for traj in demonstrations]
-    for i, p, _ in enumerate(pred_returns):
+    for i, p in enumerate(pred_returns):
         print(i,p,sorted_returns[i])
 
     print("accuracy", calc_accuracy(reward_net, training_obs, training_labels))
