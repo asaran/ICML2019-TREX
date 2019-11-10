@@ -107,7 +107,20 @@ def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_le
     return training_obs, training_labels, training_gaze
 
 
-def get_gaze_exact_loss(true_gaze, conv_gaze):
+def get_gaze_exact_loss_new(true_gaze, conv_gaze): #order of 60
+    loss = 0
+    batch_size = true_gaze.shape[0]
+    #print('batch size: ', batch_size)
+
+    # assert batch size for both conv and true gaze is the same
+    assert(batch_size==conv_gaze.shape[0])
+    
+    #print(conv_gaze.is_cuda, true_gaze.is_cuda)
+    coverage_loss = torch.sum(torch.mul(true_gaze,torch.abs(true_gaze-conv_gaze)))/batch_size
+    return coverage_loss
+
+
+def get_gaze_exact_loss_old(true_gaze, conv_gaze): # order of 60
     loss = 0
     batch_size = true_gaze.shape[0]
     #print('batch size: ', batch_size)
@@ -120,14 +133,28 @@ def get_gaze_exact_loss(true_gaze, conv_gaze):
     return coverage_loss
 
 
-def get_gaze_quadratic_coverage_loss(true_gaze, conv_gaze):
+def get_gaze_quadratic_coverage_loss_ruohan(true_gaze, conv_gaze):
     loss = 0
     batch_size = true_gaze.shape[0]
 
     # assert batch size for both conv and true gaze is the same
     assert(batch_size==conv_gaze.shape[0])
     
-    #add epsilon=1e-10 to denominator for regularized KL
+    #add epsilon=1e-10 to denominator for regularized QL
+    epsilon = 1e-10 # introduce epsilon to avoid log and division by zero error
+    conv_gaze = torch.clamp(conv_gaze, epsilon, 1)
+    return torch.sum(true_gaze*(true_gaze / conv_gaze - 1)*(true_gaze / conv_gaze - 1))/batch_size
+
+
+
+def get_gaze_quadratic_coverage_loss_akanksha(true_gaze, conv_gaze):
+    loss = 0
+    batch_size = true_gaze.shape[0]
+
+    # assert batch size for both conv and true gaze is the same
+    assert(batch_size==conv_gaze.shape[0])
+    
+    #add epsilon=1e-10 to denominator for regularized QL
     epsilon = torch.ones(conv_gaze.shape, dtype=torch.double) * 1e-10
     epsilon = epsilon.to('cpu')
     conv_gaze = conv_gaze.double().to('cpu')
@@ -139,7 +166,37 @@ def get_gaze_quadratic_coverage_loss(true_gaze, conv_gaze):
     return loss
 
 
-def get_gaze_KL_loss(true_gaze, conv_gaze):
+def get_gaze_quadratic_coverage_loss(true_gaze, conv_gaze): # very high 10e15
+    loss = 0
+    batch_size = true_gaze.shape[0]
+
+    # assert batch size for both conv and true gaze is the same
+    assert(batch_size==conv_gaze.shape[0])
+    
+    #add epsilon=1e-10 to denominator for regularized QL
+     #add epsilon=1e-10 to denominator for regularized QL
+    epsilon = 1e-10 # introduce epsilon to avoid log and division by zero error
+    conv_gaze = torch.clamp(conv_gaze, epsilon, 1)
+
+    loss = torch.sum(torch.mul(true_gaze,(torch.mul((torch.div(true_gaze,conv_gaze) - 1),(torch.div(true_gaze,conv_gaze) - 1)))))/batch_size
+    # print(type(loss), loss.type(), loss)
+    return loss
+
+def get_gaze_KL_loss(true_gaze, conv_gaze): # order of 60s
+    import torch.nn.functional as F
+    loss = 0
+    batch_size = true_gaze.shape[0]
+
+    # assert batch size for both conv and true gaze is the same
+    assert(batch_size==conv_gaze.shape[0])
+
+    epsilon = 1e-10 # introduce epsilon to avoid log and division by zero error
+    true_gaze2 = torch.clamp(true_gaze, epsilon, 1)
+    conv_gaze = torch.clamp(conv_gaze, epsilon, 1)
+    return torch.sum(torch.mul(torch.mul(true_gaze2,true_gaze),torch.log(torch.div(true_gaze2 ,conv_gaze))))/batch_size
+
+
+def get_gaze_KL_loss_akanksha_reverse(true_gaze, conv_gaze):
     import torch.nn.functional as F
     loss = 0
     batch_size = true_gaze.shape[0]
@@ -157,9 +214,25 @@ def get_gaze_KL_loss(true_gaze, conv_gaze):
 
     # TODO: add epsilon to gaze map as well. 
 
-    loss = F.kl_div(true_gaze, conv_gaze)		
+    loss = F.kl_div(true_gaze, conv_gaze)	# this is reverse KL	
     return loss.float().to('cuda')
-    
+
+
+def get_gaze_KL_loss_akanksha_forward(true_gaze, conv_gaze):
+    import torch.nn.functional as F
+    loss = 0
+    batch_size = true_gaze.shape[0]
+
+    # assert batch size for both conv and true gaze is the same
+    assert(batch_size==conv_gaze.shape[0])
+
+    #add epsilon=1e-10 to denominator for regularized KL
+    epsilon = 1e-10 # introduce epsilon to avoid log and division by zero error
+    true_gaze2 = torch.clamp(true_gaze, epsilon, 1)
+    conv_gaze = torch.clamp(conv_gaze, epsilon, 1) 
+
+    loss = F.kl_div(conv_gaze,true_gaze2)		
+    return loss.float().to('cuda') 
 
 # differentiable approximation of Earth Mover's Distance
 def get_gaze_sinkhorn_loss(true_gaze, conv_gaze):
@@ -232,7 +305,7 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
             #print('gaze_loss_type: ',gaze_loss_type)
             # if gaze_loss_type!='coverage':
             loss = output_loss + l1_reg * abs_rewards
-            writer.add_scalar('CE_loss', loss.item(), epoch)
+            writer.add_scalar('CE_loss', loss.item(), epoch*len(training_labels)+i)
 
             if gaze_loss_type in ['sinkhorn', 'quadratic', 'KL', 'exact']:
                 # ground truth human gaze maps (7x7)
@@ -249,31 +322,31 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
 
                     gaze_loss_total = (gaze_loss_i + gaze_loss_j)
                     #print('gaze loss: ', gaze_loss_total.data)  
-                    writer.add_scalar('quadratic_coverage_loss', gaze_loss_total.item(), epoch) 
+                    writer.add_scalar('quadratic_coverage_loss', gaze_loss_total.item(), epoch*len(training_labels)+i) 
 
                 elif gaze_loss_type == 'sinkhorn':
                     gaze_loss_i = get_gaze_sinkhorn_loss(gaze_i, torch.squeeze(conv_map_i))
                     gaze_loss_j = get_gaze_sinkhorn_loss(gaze_j, torch.squeeze(conv_map_j))
 
                     gaze_loss_total = (gaze_loss_i + gaze_loss_j)
-                    writer.add_scalar('sinkhorn_loss', gaze_loss_total.item(), epoch) 
+                    writer.add_scalar('sinkhorn_loss', gaze_loss_total.item(), epoch*len(training_labels)+i) 
 
                 if gaze_loss_type == 'KL':
                     gaze_loss_i = get_gaze_KL_loss(gaze_i, torch.squeeze(conv_map_i))
                     gaze_loss_j = get_gaze_KL_loss(gaze_j, torch.squeeze(conv_map_j))
 
                     gaze_loss_total = (gaze_loss_i + gaze_loss_j)
-                    writer.add_scalar('KL_loss', gaze_loss_total.item(), epoch) 
+                    writer.add_scalar('KL_loss', gaze_loss_total.item(), epoch*len(training_labels)+i) 
 
                 if gaze_loss_type == 'exact':
                     gaze_loss_i = get_gaze_exact_loss(gaze_i, torch.squeeze(conv_map_i))
                     gaze_loss_j = get_gaze_exact_loss(gaze_j, torch.squeeze(conv_map_j))
 
                     gaze_loss_total = (gaze_loss_i + gaze_loss_j)  
-                    writer.add_scalar('exact_match_loss', gaze_loss_total.item(), epoch)  
+                    writer.add_scalar('exact_match_loss', gaze_loss_total.item(), epoch*len(training_labels)+i)  
 
                 loss += gaze_reg * gaze_loss_total
-                writer.add_scalar('total_loss', loss.item(), epoch)
+                writer.add_scalar('total_loss', loss.item(), epoch*len(training_labels)+i)
 
             loss.backward()
             optimizer.step()
@@ -289,6 +362,7 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
                 print("check pointing")
                 torch.save(reward_net.state_dict(), checkpoint_dir)
     print("finished training")
+    writer.close()
 
 
 
