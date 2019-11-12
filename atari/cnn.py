@@ -55,7 +55,7 @@ class Net(nn.Module):
             print('invalid gaze_conv_layer. Must be between 1-4.')
             #exit(0)
 
-        if self.gaze_loss_type is not None and gaze_conv is not None:
+        if self.gaze_loss_type is not None and gaze_conv_layer!=0:
             # sum over all dimensions of the conv map
             conv_map = gaze_conv.sum(dim=1)
 
