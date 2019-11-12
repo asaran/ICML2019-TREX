@@ -107,7 +107,7 @@ def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_le
     return training_obs, training_labels, training_gaze
 
 
-def get_gaze_exact_loss_new(true_gaze, conv_gaze): #order of 60
+def get_gaze_exact_loss(true_gaze, conv_gaze): #order of 60
     loss = 0
     batch_size = true_gaze.shape[0]
     #print('batch size: ', batch_size)
