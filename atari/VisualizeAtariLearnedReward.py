@@ -13,6 +13,7 @@ import torch
 from run_test import *
 import matplotlib.pylab as plt
 import argparse
+from cnn import Net
 
 parser = argparse.ArgumentParser(description=None)
 parser.add_argument('--env_name', default='', help='Select the environment name to run, i.e. pong')
@@ -20,7 +21,7 @@ parser.add_argument('--reward_net_path', default='', help="name and location for
 parser.add_argument('--seed', default=0, help="random seed for experiments")
 parser.add_argument('--models_dir', default = ".", help="top directory where checkpoint models for demos are stored")
 parser.add_argument('--save_fig_dir', help ="where to save visualizations")
-
+parser.add_argument('--data_dir', default='../../learning-rewards-of-learners/data/atari-head/', help='path to data directory with demonstrations')
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # Assume that we are on a CUDA machine, then this should print a CUDA device:
@@ -65,13 +66,11 @@ env = make_vec_env(env_id, 'atari', 1, 0,
 env = VecFrameStack(env, 4)
 agent = PPO2Agent(env, env_type, stochastic)
 
-
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
+'''
 class Net(nn.Module):
     def __init__(self):
         super().__init__()
@@ -87,7 +86,7 @@ class Net(nn.Module):
 
 
     def cum_return(self, traj):
-        '''calculate cumulative return of trajectory'''
+        #calculate cumulative return of trajectory
         sum_rewards = 0
         sum_abs_rewards = 0
         for x in traj:
@@ -106,11 +105,11 @@ class Net(nn.Module):
 
 
     def forward(self, traj_i, traj_j):
-        '''compute cumulative return for each trajectory and return logits'''
+        #compute cumulative return for each trajectory and return logits
         cum_r_i, abs_r_i = self.cum_return(traj_i)
         cum_r_j, abs_r_j = self.cum_return(traj_j)
         return torch.cat([cum_r_i, cum_r_j]), abs_r_i + abs_r_j
-
+'''
 
 reward = Net()
 reward.load_state_dict(torch.load(reward_net_path))
@@ -119,6 +118,7 @@ reward.to(device)
 
 
 #generate some trajectories for inspecting learned reward
+'''
 checkpoint_min = 50
 checkpoint_max = 600
 checkpoint_step = 50
@@ -147,6 +147,7 @@ print(checkpoints_demos)
 
 
 #generate some trajectories for inspecting learned reward
+
 checkpoint_min = 650
 checkpoint_max = 1450
 checkpoint_step = 50
@@ -220,6 +221,7 @@ for checkpoint in checkpoints_demos:
 learning_returns_extrapolate = []
 pred_returns_extrapolate = []
 
+
 for checkpoint in checkpoints_extrapolate:
 
     model_path = model_dir + "/models/" + env_name + "_25/" + checkpoint
@@ -261,6 +263,13 @@ for checkpoint in checkpoints_extrapolate:
 
 env.close()
 
+'''
+import utils
+import atari_head_dataset as ahd
+# get real human demos
+
+dataset = ahd.AtariHeadDataset(args.env_name, args.data_dir)
+demonstrations, learning_returns, learning_rewards, learning_gaze = utils.get_preprocessed_trajectories(env_name, dataset, args.data_dir, use_gaze=False)
 
 
 
@@ -274,7 +283,7 @@ def convert_range(x,minimum, maximum,a,b):
 
 # In[12]:
 
-
+'''
 buffer = 20
 if env_name == "pong":
     buffer = 2
@@ -299,7 +308,7 @@ plt.xlabel("Ground Truth Returns")
 plt.ylabel("Predicted Returns (normalized)")
 plt.tight_layout()
 plt.savefig(save_fig_dir + "/" + env_name + "_gt_vs_pred_rewards.png")
-
+'''
 
 
 
