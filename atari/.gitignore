@@ -3,3 +3,4 @@ path_to_logs/*
 learned_models/*
 eval/*
 models/*
+viz/*
