@@ -111,7 +111,7 @@ class Net(nn.Module):
         return torch.cat([cum_r_i, cum_r_j]), abs_r_i + abs_r_j
 '''
 
-reward = Net()
+reward = Net(gaze_dropout=False, gaze_loss_type=None)
 reward.load_state_dict(torch.load(reward_net_path))
 reward.to(device)
 
@@ -269,7 +269,7 @@ import atari_head_dataset as ahd
 # get real human demos
 
 dataset = ahd.AtariHeadDataset(args.env_name, args.data_dir)
-demonstrations, learning_returns, learning_rewards, learning_gaze = utils.get_preprocessed_trajectories(env_name, dataset, args.data_dir, use_gaze=False)
+demonstrations, learning_returns, learning_rewards, learning_gaze = utils.get_preprocessed_trajectories(env_name, dataset, args.data_dir, use_gaze=False, gaze_conv_layer=0, use_motion=False)
 
 
 
@@ -331,6 +331,8 @@ with torch.no_grad():
             elif r > max_reward:
                 max_reward = r
                 max_frame = s
+                print(max_frame.shape)
+                #exit(1)
                 max_frame_i = i+2
 
 
@@ -341,15 +343,16 @@ with torch.no_grad():
 def mask_coord(i,j,frames, mask_size, channel):
     #takes in i,j pixel and stacked frames to mask
     masked = frames.copy()
-    masked[:,i:i+mask_size,j:j+mask_size,channel] = 0
+    #print(masked.shape)
+    masked[i:i+mask_size,j:j+mask_size,channel] = 0
     return masked
 
 def gen_attention_maps(frames, mask_size):
 
     orig_frame = frames
-
+    #print(orig_frame.shape)
     #okay so I want to vizualize what makes these better or worse.
-    _,height,width,channels = orig_frame.shape
+    height,width,channels = orig_frame.shape
 
     #find reward without any masking once
     r_before = reward.cum_return(torch.from_numpy(np.array([orig_frame])).float().to(device))[0].item()
@@ -388,11 +391,12 @@ plt.savefig(save_fig_dir + "/" + env_name + "max_attention.png", bbox_inches='ti
 
 
 plt.figure(6)
-print(max_frame_i)
-print(max_reward)
+#print(max_frame_i)
+#print(max_reward)
 for cnt in range(4):
     plt.subplot(1,4,cnt+1)
-    plt.imshow(max_frame[0][:,:,cnt])
+    print(max_frame[0].shape)
+    plt.imshow(max_frame[:,:,cnt])
     plt.axis('off')
 plt.tight_layout()
 plt.savefig(save_fig_dir + "/" + env_name + "max_frames.png", bbox_inches='tight')
@@ -413,7 +417,7 @@ print(min_reward)
 plt.figure(8)
 for cnt in range(4):
     plt.subplot(1,4,cnt+1)
-    plt.imshow(min_frame[0][:,:,cnt])
+    plt.imshow(min_frame[:,:,cnt])
     plt.axis('off')
 plt.tight_layout()
 plt.savefig(save_fig_dir + "/" + env_name + "min_frames.png", bbox_inches='tight')
@@ -430,7 +434,7 @@ rand_frames = demonstrations[d_rand][f_rand]
 plt.figure(9)
 for cnt in range(4):
     plt.subplot(1,4,cnt+1)
-    plt.imshow(rand_frames[0][:,:,cnt])
+    plt.imshow(rand_frames[:,:,cnt])
     plt.axis('off')
 plt.tight_layout()
 plt.savefig(save_fig_dir + "/" + env_name + "random_frames.png", bbox_inches='tight')
