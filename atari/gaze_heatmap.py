@@ -23,8 +23,8 @@ class DatasetWithHeatmap:
         self.train_size = len(self.frameid2pos.keys())
         self.HEATMAP_SHAPE = heatmap_shape
     
-        if(heatmap_shape<=7):
-            self.HEATMAP_SHAPE *= 2
+        #if(heatmap_shape<=7):
+        #    self.HEATMAP_SHAPE *= 2
         self.GHmap = np.zeros([self.train_size, self.HEATMAP_SHAPE, self.HEATMAP_SHAPE, 1], dtype=np.float32)
         
         # print("Running BIU.convert_gaze_pos_to_heap_map() and convolution...")
@@ -43,9 +43,9 @@ class DatasetWithHeatmap:
         self.GHmap = self.preprocess_gaze_heatmap(sigmaH, sigmaW, 0).astype(np.float32)
         # print(np.count_nonzero(self.GHmap))
 
-        if heatmap_shape<=7:
-            import scipy.ndimage
-            self.GHmap = scipy.ndimage.zoom(self.GHmap, (1, 0.5, 0.5, 1))
+        #if heatmap_shape<=7:
+        #    import scipy.ndimage
+        #    self.GHmap = scipy.ndimage.zoom(self.GHmap, (1, 0.5, 0.5, 1))
 
         # print("Normalizing the heat map...")
         #for i in range(len(self.GHmap)):
@@ -95,7 +95,7 @@ class DatasetWithHeatmap:
         model = K.models.Sequential()
         model.add(K.layers.Lambda(lambda x: x+bg_prob_density, input_shape=(self.GHmap.shape[1],self.GHmap.shape[2],1)))
 
-        if sigmaH > 0.0 and sigmaW > 0.0:
+        if sigmaH > 1 and sigmaW > 1: # was 0,0; don't blur if size too small
             lh, lw = int(4*sigmaH), int(4*sigmaW)
             x, y = np.mgrid[-lh:lh+1:1, -lw:lw+1:1] # so the kernel size is [lh*2+1,lw*2+1]
             pos = np.dstack((x, y))
