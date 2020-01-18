@@ -8,3 +8,13 @@ submit_scripts/*.sh
 baselines/baselines/ppo2/__pycache__/*
 videos/*
 gaze_videos/*
+gazeNetwork/pretrained_models/*
+test_data/*
+tf
+sys
+argparse
+np
+gym
+.ipynb_checkpoints/*
+gazeNetwork/.ipynb_checkpoints/*
+asc/*
