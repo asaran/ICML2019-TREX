@@ -16,15 +16,12 @@ class DatasetWithHeatmap:
         self.HEATMAP_SHAPE = 14
         
     def createGazeHeatmap(self, gaze_coords, heatmap_shape):
-        # print("Reading gaze data ASC file, and converting per-frame gaze positions to heat map...")
-        # print(gaze_coords)
+        # converting per-frame gaze positions to heat map...
         self.frameid2pos = self.get_gaze_data(gaze_coords)
-        # print(self.frameid2pos)
         self.train_size = len(self.frameid2pos.keys())
         self.HEATMAP_SHAPE = heatmap_shape
     
-        #if(heatmap_shape<=7):
-        #    self.HEATMAP_SHAPE *= 2
+        
         self.GHmap = np.zeros([self.train_size, self.HEATMAP_SHAPE, self.HEATMAP_SHAPE, 1], dtype=np.float32)
         
         # print("Running BIU.convert_gaze_pos_to_heap_map() and convolution...")
@@ -41,17 +38,6 @@ class DatasetWithHeatmap:
         sigmaH = 28.50 * self.HEATMAP_SHAPE / self.SCR_H
         sigmaW = 44.58 * self.HEATMAP_SHAPE / self.SCR_W
         self.GHmap = self.preprocess_gaze_heatmap(sigmaH, sigmaW, 0).astype(np.float32)
-        # print(np.count_nonzero(self.GHmap))
-
-        #if heatmap_shape<=7:
-        #    import scipy.ndimage
-        #    self.GHmap = scipy.ndimage.zoom(self.GHmap, (1, 0.5, 0.5, 1))
-
-        # print("Normalizing the heat map...")
-        #for i in range(len(self.GHmap)):
-        #    SUM = self.GHmap[i].sum()
-        #    if SUM != 0:
-        #        self.GHmap[i] /= SUM
 
         for i in range(len(self.GHmap)):
             max_val = self.GHmap[i].max()
@@ -59,10 +45,7 @@ class DatasetWithHeatmap:
             if max_val!=min_val:
                 self.GHmap[i] = (self.GHmap[i] - min_val)/(max_val - min_val)
 
-        # print("Done. BIU.convert_gaze_pos_to_heap_map() and convolution used: %.1fs" % (time.time()-t1))
-        # print(type(self.GHmap))
         if not np.count_nonzero(self.GHmap):
-            # print(gaze_coords)
             print('The gaze map is all zeros')
             
 
@@ -91,7 +74,7 @@ class DatasetWithHeatmap:
     def preprocess_gaze_heatmap(self, sigmaH, sigmaW, bg_prob_density, debug_plot_result=False):
         from scipy.stats import multivariate_normal
         import tensorflow as tf, keras as K # don't move this to the top, as people who import this file might not have keras or tf
-#         print(self.GHmap[0,:,:,:])
+#         
         model = K.models.Sequential()
         model.add(K.layers.Lambda(lambda x: x+bg_prob_density, input_shape=(self.GHmap.shape[1],self.GHmap.shape[2],1)))
 
@@ -103,27 +86,16 @@ class DatasetWithHeatmap:
             assert gkernel.sum() > 0.95, "Simple sanity check: prob density should add up to nearly 1.0"
 
             model.add(K.layers.Lambda(lambda x: tf.pad(x,[(0,0),(lh,lh),(lw,lw),(0,0)],'REFLECT')))
-            # print(gkernel.shape, sigmaH, sigmaW)
             model.add(K.layers.Conv2D(1, kernel_size=gkernel.shape, strides=1, padding="valid", use_bias=False,
                 activation="linear", kernel_initializer=K.initializers.Constant(gkernel)))
         else:
             print ("WARNING: Gaussian filter's sigma is 0, i.e. no blur.")
         # The following normalization hurts accuracy. I don't know why. But intuitively it should increase accuracy
-        #def GH_normalization(x):
-        #    sum_per_GH = tf.reduce_sum(x,axis=[1,2,3])
-        #    sum_per_GH_correct_shape = tf.reshape(sum_per_GH, [tf.shape(sum_per_GH)[0],1,1,1])
-        #    # normalize values to range [0,1], on a per heap-map basis
-        #    x = x/sum_per_GH_correct_shape
-        #    return x
-        #model.add(K.layers.Lambda(lambda x: GH_normalization(x)))
-        
         model.compile(optimizer='rmsprop', # not used
             loss='categorical_crossentropy', # not used
             metrics=None)
         
-        # print(np.count_nonzero(self.GHmap))
         output=model.predict(self.GHmap, batch_size=500)
-        # print(type(output))
         # print(np.count_nonzero(output))
 
         if debug_plot_result:
@@ -148,10 +120,6 @@ class DatasetWithHeatmap:
     def convert_gaze_pos_to_heap_map(self, gaze_pos_list, out):
         h,w = out.shape[0], out.shape[1]
         bad_count = 0
-        # for (x,y) in gaze_pos_list: 
-        # print(gaze_pos_list)
-        # print(len(gaze_pos_list))
-        # if(not np.isnan(gaze_pos_list).all()): 
         if not np.isnan(gaze_pos_list).all():
             for j in range(0,len(gaze_pos_list),2):
                 x = gaze_pos_list[j]
@@ -161,31 +129,4 @@ class DatasetWithHeatmap:
                 except IndexError: # the computed X,Y position is not in the gaze heat map
                     bad_count += 1
         return bad_count
-
-
-
-    def reshape_gazemap(self, heatmap_shape):
-        sigmaH = 28.50 * self.HEATMAP_SHAPE / self.SCR_H
-        sigmaW = 44.58 * self.HEATMAP_SHAPE / self.SCR_W
-        self.GHmap = self.preprocess_gaze_heatmap(sigmaH, sigmaW, 0).astype(np.float32)
-        # print(np.count_nonzero(self.GHmap))
-
-        if heatmap_shape<=7:
-            import scipy.ndimage
-            self.GHmap = scipy.ndimage.zoom(self.GHmap, (1, 0.5, 0.5, 1))
-
-        # print("Normalizing the heat map...")
-        for i in range(len(self.GHmap)):
-            SUM = self.GHmap[i].sum()
-            if SUM != 0:
-                self.GHmap[i] /= SUM
-
-        # print("Done. BIU.convert_gaze_pos_to_heap_map() and convolution used: %.1fs" % (time.time()-t1))
-        # print(type(self.GHmap))
-        if not np.count_nonzero(self.GHmap):
-            # print(gaze_coords)
-            print('The gaze map is all zeros')
-            
-
-        return self.GHmap
     
