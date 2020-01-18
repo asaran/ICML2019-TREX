@@ -84,7 +84,7 @@ def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_le
             tj_start = np.random.randint(min_length - rand_length + 1)
             #print(tj_start, len(demonstrations[ti]))
             ti_start = np.random.randint(tj_start, len(demonstrations[ti]) - rand_length + 1)
-        traj_i = demonstrations[ti][ti_start:ti_start+rand_length:2] #skip everyother framestack to reduce size
+        traj_i = demonstrations[ti][ti_start:ti_start+rand_length:2] #skip every other framestack to reduce size
         traj_j = demonstrations[tj][tj_start:tj_start+rand_length:2]
 
         if use_gaze:
@@ -295,6 +295,7 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
 
             #forward + backward + optimize
             if gaze_loss_type in ['sinkhorn', 'quadratic', 'KL', 'exact']:
+                # print('traj_i: ',traj_i.shape)
                 outputs, abs_rewards, conv_map_i, conv_map_j = reward_network.forward(traj_i, traj_j, gaze_conv_layer)
             else:
                 outputs, abs_rewards, _, _ = reward_network.forward(traj_i, traj_j)	
@@ -420,6 +421,9 @@ if __name__=="__main__":
     parser.add_argument('--gaze_dropout', default=False, action='store_true', help="use gaze modulated dropout or not")
     parser.add_argument('--motion', default=False, action='store_true', help="use motion as ground truth gaze")
     parser.add_argument('--gaze_conv_layer', default=4, type=int, help='the convlayer of the reward network to which gaze should be compared')
+    parser.add_argument('--mask_scores', default=False,
+                        action='store_true', help="mask scores on game screen or not")
+
 
     args = parser.parse_args()
     env_name = args.env_name
@@ -459,7 +463,7 @@ if __name__=="__main__":
     use_gaze = args.gaze_dropout or (args.gaze_loss is not None)
     gaze_loss_type = args.gaze_loss
     gaze_reg = args.gaze_reg
-    # mask = args.mask_scores
+    mask_score = args.mask_scores
     gaze_conv_layer = args.gaze_conv_layer
     gaze_dropout = args.gaze_dropout
     print('*************** GAZE: ',use_gaze,'****************')
@@ -478,7 +482,7 @@ if __name__=="__main__":
     # Use Atari-HEAD human demos
     data_dir = args.data_dir
     dataset = ahd.AtariHeadDataset(env_name, data_dir)
-    demonstrations, learning_returns, learning_rewards, learning_gaze = utils.get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, gaze_conv_layer, use_motion)
+    demonstrations, learning_returns, learning_rewards, learning_gaze = utils.get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, gaze_conv_layer, use_motion, mask_score)
 
     if use_motion:
         use_gaze=True
@@ -502,9 +506,10 @@ if __name__=="__main__":
     sorted_returns = sorted(learning_returns)
     print(sorted_returns)
     
+    # print('demo before creating data: ', demonstrations[0].shape)
     training_data = create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, learning_gaze, use_gaze)
     training_obs, training_labels, training_gaze = training_data
-
+    # print('demo after creating data: ', training_obs[0].shape)
     #print(len(training_obs[0][0]), len(training_obs[0][1]), len(training_gaze7[0][0]), len(training_gaze7[0][1])) 
     #exit(0)
 
