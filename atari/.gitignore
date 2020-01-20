@@ -19,3 +19,4 @@ gym
 gazeNetwork/.ipynb_checkpoints/*
 asc/*
 .vscode/*
+logs/*
