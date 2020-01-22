@@ -4,3 +4,5 @@ learned_models/*
 eval/*
 models/*
 viz/*
+gaze_videos/*
+videos/*
