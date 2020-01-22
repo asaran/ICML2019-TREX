@@ -21,15 +21,23 @@ def normalize(obs, max_val):
         norm_map = obs
     return norm_map
 
-def mask_score(obs, crop_top = True):
+def mask_score(obs, env_name, crop_top=True):
     if crop_top:
-        #takes a stack of four observations and blacks out (sets to zero) top n rows
+        # takes a stack of four observations and blacks out (sets to zero) top n rows
         n = 10
-        #no_score_obs = copy.deepcopy(obs)
-        obs[:,:n,:,:] = 0
+        obs[:, :n, :, :] = 0
+    elif env_name=='hero':
+        # crop more rows in the bottom
+        #print('cropping more from bottom')
+        n = 15
+        obs[:, -n:, :, :] = 0
+    elif env_name=='enduro':
+        n=20
+        obs[:, -n:, :, :] = 0
     else:
-        n = 20
-        obs[:,-n:,:,:] = 0
+        # crop less rows in bottom
+        n = 10
+        obs[:, -n:, :, :] = 0
     return obs
 
 #need to grayscale and warp to 84x84
@@ -407,14 +415,14 @@ def get_sorted_traj_indices(env_name, dataset):
     return demos
 
 
-def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, gaze_conv_layer, use_motion):
+def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, gaze_conv_layer, use_motion, mask_scores):
     """returns an array of trajectories corresponding to what you would get running checkpoints from PPO
        demonstrations are grayscaled, maxpooled, stacks of 4 with normalized values between 0 and 1 and
        top section of screen is masked
     """
     #mspacman score is on the bottom of the screen
-    if env_name == 'mspacman':
-        crop_top = False
+    if env_name in ['mspacman', 'centipede', 'asterix', 'berzerk', 'hero', 'enduro']:
+        crop_top = False  # mask out few rows from the bottom
     else:
         crop_top = True
 
@@ -439,9 +447,10 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, gaze_co
         #normalize values to be between 0 and 1 and have top part masked
         for ob in stacked_traj:
             # if mask_scores:
-            #     demo_norm_mask.append(mask_score(normalize_state(ob), crop_top))
+            #     demo_norm_mask.append(mask_score(normalize_state(ob), env_name, crop_top))
             # else:
             #     demo_norm_mask.append(normalize_state(ob))  # currently not cropping
+            #     print('norm state obs: ', ob.shape)
 
             demo_norm_mask.append(preprocess(ob, env_name)[0])
         human_demos.append(demo_norm_mask)
@@ -467,11 +476,7 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, gaze_co
             human_gaze.append(stacked_motion)
 
         elif use_gaze:
-            # just return the gaze coordinates themselves
-            # skipped_gaze = SkipGazeCoords(gaze)
-            # stacked_gaze = StackGazeCoords(skipped_gaze)
-            # human_gaze.append(stacked_gaze)
-
+            
             # generate gaze heatmaps as per Ruohan's algorithm
             h = gh.DatasetWithHeatmap()
             # g_26 = h.createGazeHeatmap(gaze, 26)
@@ -490,26 +495,15 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, gaze_co
                 exit(1)
             g = h.createGazeHeatmap(gaze, conv_size)
 
-            # skip and stack gaze
-            # maxed_gaze_26 = MaxSkipGaze(g_26, 26)
-            # stacked_gaze_26 = CollapseGaze(maxed_gaze_26, 26)
-            # human_gaze_26.append(stacked_gaze_26)
-
-            # maxed_gaze_11 = MaxSkipGaze(g_11, 11)
-            # stacked_gaze_11 = CollapseGaze(maxed_gaze_11, 11)
-            # human_gaze_11.append(stacked_gaze_11)
-
             maxed_gaze = MaxSkipGaze(g, conv_size)
             stacked_gaze = CollapseGaze(maxed_gaze, conv_size)
             human_gaze.append(stacked_gaze)
-
-            # print('maxed gaze type: ',type(maxed_gaze_11)) #list
-            # print('stacked gaze type: ',type(stacked_gaze_11)) #list
-
-
+            print('stacked gaze: ', stacked_gaze[0].shape)
+            
     if(use_gaze):    
         print(len(human_demos[0]), len(human_rewards[0]), len(human_gaze[0]))
         print(len(human_demos), len(human_rewards), len(human_gaze))
+        
     return human_demos, human_scores, human_rewards, human_gaze
 
 
@@ -582,71 +576,6 @@ def get_all_gaze_heatmaps(gaze_coords, heatmap_size):
         end = time.time()
         print('time for 50 heatmaps: ', end-start)
 
-    print('generated 10,000 gaze heatmp pais of size: ', heatmap_size)
+    print('generated 10,000 gaze heatmp pairs of size: ', heatmap_size)
     return human_gaze
 
-
-
-def generate_novice_demos(env, env_name, agent, model_dir):
-    checkpoint_min = 50
-    checkpoint_max = 600
-    checkpoint_step = 50
-    checkpoints = []
-    if env_name == "enduro":
-        checkpoint_min = 3100
-        checkpoint_max = 3650
-    elif env_name == "seaquest":
-        checkpoint_min = 10
-        checkpoint_max = 65
-        checkpoint_step = 5
-    for i in range(checkpoint_min, checkpoint_max + checkpoint_step, checkpoint_step):
-        if i < 10:
-            checkpoints.append('0000' + str(i))
-        elif i < 100:
-            checkpoints.append('000' + str(i))
-        elif i < 1000:
-            checkpoints.append('00' + str(i))
-        elif i < 10000:
-            checkpoints.append('0' + str(i))
-    print(checkpoints)
-
-    demonstrations = []
-    learning_returns = []
-    learning_rewards = []
-    for checkpoint in checkpoints:
-
-        model_path = model_dir + "/models/" + env_name + "_25/" + checkpoint
-        if env_name == "seaquest":
-            model_path = model_dir + "/models/" + env_name + "_5/" + checkpoint
-
-        agent.load(model_path)
-        episode_count = 1
-        for i in range(episode_count):
-            done = False
-            traj = []
-            gt_rewards = []
-            r = 0
-
-            ob = env.reset()
-            steps = 0
-            acc_reward = 0
-            while True:
-                action = agent.act(ob, r, done)
-                ob, r, done, _ = env.step(action)
-                ob_processed = preprocess(ob, env_name)
-                ob_processed = ob_processed[0] #get rid of first dimension ob.shape = (1,84,84,4)
-                traj.append(ob_processed)
-
-                gt_rewards.append(r[0])
-                steps += 1
-                acc_reward += r[0]
-                if done:
-                    print("checkpoint: {}, steps: {}, return: {}".format(checkpoint, steps,acc_reward))
-                    break
-            print("traj length", len(traj))
-            print("demo length", len(demonstrations))
-            demonstrations.append(traj)
-            learning_returns.append(acc_reward)
-            learning_rewards.append(gt_rewards)
-
-    return demonstrations, learning_returns, learning_rewards

@@ -1,3 +1,5 @@
+#!/scratch/cluster/asaran/anaconda2/envs/trex/bin/python
+
 import argparse
 import sys
 import numpy as np
