@@ -62,7 +62,6 @@ def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_le
             training_gaze.append((gaze_i, gaze_j))
         max_traj_length = max(max_traj_length, len(traj_i), len(traj_j))
 
-    # TODO: why 2 for loops?
     #fixed size snippets with progress prior
     for n in range(num_snippets):
         ti = 0
@@ -72,17 +71,16 @@ def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_le
             #pick two random demonstrations
             ti = np.random.randint(num_demos)
             tj = np.random.randint(num_demos)
+
         #create random snippets
         #find min length of both demos to ensure we can pick a demo no earlier than that chosen in worse preferred demo
         min_length = min(len(demonstrations[ti]), len(demonstrations[tj]))
         rand_length = np.random.randint(min_snippet_length, max_snippet_length)
         if ti < tj: #pick tj snippet to be later than ti
             ti_start = np.random.randint(min_length - rand_length + 1)
-            #print(ti_start, len(demonstrations[tj]))
             tj_start = np.random.randint(ti_start, len(demonstrations[tj]) - rand_length + 1)
         else: #ti is better so pick later snippet in ti
             tj_start = np.random.randint(min_length - rand_length + 1)
-            #print(tj_start, len(demonstrations[ti]))
             ti_start = np.random.randint(tj_start, len(demonstrations[ti]) - rand_length + 1)
         traj_i = demonstrations[ti][ti_start:ti_start+rand_length:2] #skip every other framestack to reduce size
         traj_j = demonstrations[tj][tj_start:tj_start+rand_length:2]
@@ -102,68 +100,18 @@ def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_le
             training_gaze.append((gaze_i, gaze_j))
 
     print("maximum traj length", max_traj_length)
-    print(len(training_labels), len(training_obs), len(training_gaze))
-    #exit(0)
     return training_obs, training_labels, training_gaze
 
 
 def get_gaze_exact_loss(true_gaze, conv_gaze): #order of 60
     loss = 0
     batch_size = true_gaze.shape[0]
-    #print('batch size: ', batch_size)
 
     # assert batch size for both conv and true gaze is the same
     assert(batch_size==conv_gaze.shape[0])
-    
-    #print(conv_gaze.is_cuda, true_gaze.is_cuda)
+
     coverage_loss = torch.sum(torch.mul(true_gaze,torch.abs(true_gaze-conv_gaze)))/batch_size
     return coverage_loss
-
-
-def get_gaze_exact_loss_old(true_gaze, conv_gaze): # order of 60
-    loss = 0
-    batch_size = true_gaze.shape[0]
-    #print('batch size: ', batch_size)
-
-    # assert batch size for both conv and true gaze is the same
-    assert(batch_size==conv_gaze.shape[0])
-    
-    #print(conv_gaze.is_cuda, true_gaze.is_cuda)
-    coverage_loss = torch.sum(torch.bmm(true_gaze,torch.abs(true_gaze-conv_gaze)))/batch_size
-    return coverage_loss
-
-
-def get_gaze_quadratic_coverage_loss_ruohan(true_gaze, conv_gaze):
-    loss = 0
-    batch_size = true_gaze.shape[0]
-
-    # assert batch size for both conv and true gaze is the same
-    assert(batch_size==conv_gaze.shape[0])
-    
-    #add epsilon=1e-10 to denominator for regularized QL
-    epsilon = 1e-10 # introduce epsilon to avoid log and division by zero error
-    conv_gaze = torch.clamp(conv_gaze, epsilon, 1)
-    return torch.sum(true_gaze*(true_gaze / conv_gaze - 1)*(true_gaze / conv_gaze - 1))/batch_size
-
-
-
-def get_gaze_quadratic_coverage_loss_akanksha(true_gaze, conv_gaze):
-    loss = 0
-    batch_size = true_gaze.shape[0]
-
-    # assert batch size for both conv and true gaze is the same
-    assert(batch_size==conv_gaze.shape[0])
-    
-    #add epsilon=1e-10 to denominator for regularized QL
-    epsilon = torch.ones(conv_gaze.shape, dtype=torch.double) * 1e-10
-    epsilon = epsilon.to('cpu')
-    conv_gaze = conv_gaze.double().to('cpu')
-    conv_gaze = conv_gaze + torch.where(conv_gaze>0,-1*epsilon, epsilon)
-
-    div = torch.addcdiv(torch.zeros(true_gaze.shape), 1, true_gaze.to('cpu'), conv_gaze.float().to('cpu'), out=None) #point wise division
-    quadratic = div * div
-    loss = torch.sum(torch.bmm(true_gaze, quadratic.to('cuda')))/batch_size
-    return loss
 
 
 def get_gaze_quadratic_coverage_loss(true_gaze, conv_gaze): # very high 10e15
@@ -174,12 +122,10 @@ def get_gaze_quadratic_coverage_loss(true_gaze, conv_gaze): # very high 10e15
     assert(batch_size==conv_gaze.shape[0])
     
     #add epsilon=1e-10 to denominator for regularized QL
-     #add epsilon=1e-10 to denominator for regularized QL
     epsilon = 1e-10 # introduce epsilon to avoid log and division by zero error
     conv_gaze = torch.clamp(conv_gaze, epsilon, 1)
 
     loss = torch.sum(torch.mul(true_gaze,(torch.mul((torch.div(true_gaze,conv_gaze) - 1),(torch.div(true_gaze,conv_gaze) - 1)))))/batch_size
-    # print(type(loss), loss.type(), loss)
     return loss
 
 def get_gaze_KL_loss(true_gaze, conv_gaze): # order of 60s
@@ -195,44 +141,6 @@ def get_gaze_KL_loss(true_gaze, conv_gaze): # order of 60s
     conv_gaze = torch.clamp(conv_gaze, epsilon, 1)
     return torch.sum(torch.mul(torch.mul(true_gaze2,true_gaze),torch.log(torch.div(true_gaze2 ,conv_gaze))))/batch_size
 
-
-def get_gaze_KL_loss_akanksha_reverse(true_gaze, conv_gaze):
-    import torch.nn.functional as F
-    loss = 0
-    batch_size = true_gaze.shape[0]
-
-    # assert batch size for both conv and true gaze is the same
-    assert(batch_size==conv_gaze.shape[0])
-
-    #add epsilon=1e-10 to denominator for regularized KL
-    epsilon = torch.ones(conv_gaze.shape, dtype=torch.float64) * 1e-10
-    epsilon = epsilon.to('cpu')
-    conv_gaze = conv_gaze.double().to('cpu')
-    # TODO: count ,zero, non-zero elements per feature map and gaze map. Divide epsilon and multiply epsilon with that value.
-    conv_gaze = conv_gaze + torch.where(conv_gaze>0,-1*epsilon, epsilon)
-    true_gaze = true_gaze.double().to('cpu')
-
-    # TODO: add epsilon to gaze map as well. 
-
-    loss = F.kl_div(true_gaze, conv_gaze)	# this is reverse KL	
-    return loss.float().to('cuda')
-
-
-def get_gaze_KL_loss_akanksha_forward(true_gaze, conv_gaze):
-    import torch.nn.functional as F
-    loss = 0
-    batch_size = true_gaze.shape[0]
-
-    # assert batch size for both conv and true gaze is the same
-    assert(batch_size==conv_gaze.shape[0])
-
-    #add epsilon=1e-10 to denominator for regularized KL
-    epsilon = 1e-10 # introduce epsilon to avoid log and division by zero error
-    true_gaze2 = torch.clamp(true_gaze, epsilon, 1)
-    conv_gaze = torch.clamp(conv_gaze, epsilon, 1) 
-
-    loss = F.kl_div(conv_gaze,true_gaze2)		
-    return loss.float().to('cuda') 
 
 # differentiable approximation of Earth Mover's Distance
 def get_gaze_sinkhorn_loss(true_gaze, conv_gaze):
@@ -260,16 +168,14 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
     import os
     from pathlib import Path
     if not os.path.isdir(checkpoint_dir+'_tb'):
-        #path = Path(checkpoint_dir+'/tb')
         os.makedirs(checkpoint_dir+'_tb')
-        #path.mkdir(parents=True)
     writer = SummaryWriter(checkpoint_dir+'_tb')
     
     loss_criterion = nn.CrossEntropyLoss()
     cum_loss = 0.0
  
     training_inputs, training_outputs, training_gaze = training_data
-    #print(len(training_inputs[0][0]), len(training_inputs[0][1]), len(training_gaze7[0][0]), len(training_gaze7[0][1]))
+
     if gaze_loss_type in ['sinkhorn', 'quadratic', 'KL', 'exact']:
         training_data = list(zip(training_inputs, training_outputs, training_gaze))
     else:
@@ -282,7 +188,7 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
             training_obs, training_labels = zip(*training_data)
         for i in range(len(training_labels)):
             traj_i, traj_j = training_obs[i]
-            #print(len(traj_i), len(traj_j))
+
             labels = np.array([training_labels[i]])
             traj_i = np.array(traj_i)
             traj_j = np.array(traj_j)
@@ -295,27 +201,20 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
 
             #forward + backward + optimize
             if gaze_loss_type in ['sinkhorn', 'quadratic', 'KL', 'exact']:
-                # print('traj_i: ',traj_i.shape)
                 outputs, abs_rewards, conv_map_i, conv_map_j = reward_network.forward(traj_i, traj_j, gaze_conv_layer)
             else:
                 outputs, abs_rewards, _, _ = reward_network.forward(traj_i, traj_j)	
-            # outputs, abs_rewards = reward_network.forward(traj_i, traj_j)
             outputs = outputs.unsqueeze(0)
             output_loss = loss_criterion(outputs, labels)
 
-            #print('gaze_loss_type: ',gaze_loss_type)
-            # if gaze_loss_type!='coverage':
             loss = output_loss + l1_reg * abs_rewards
             writer.add_scalar('CE_loss', loss.item(), epoch*len(training_labels)+i)
 
             if gaze_loss_type in ['sinkhorn', 'quadratic', 'KL', 'exact']:
                 # ground truth human gaze maps (7x7)
                 gaze_i, gaze_j = training_gaze[i]
-                # TODO: gaze_i, gaze_j are tensors?
-                #print(type(gaze7_i), type(gaze7_i[0]))
                 gaze_i = torch.squeeze(torch.tensor(gaze_i, device=device)) # list of torch tensors
                 gaze_j = torch.squeeze(torch.tensor(gaze_j, device=device))
-                #print(i,type(gaze7_i), gaze7_i.size(), torch.squeeze(conv_map_i).size(), traj_i.size())
 
                 if gaze_loss_type == 'quadratic':
                     gaze_loss_i = get_gaze_quadratic_coverage_loss(gaze_i, torch.squeeze(conv_map_i))
@@ -356,16 +255,12 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
             item_loss = loss.item()
             cum_loss += item_loss
             if i % 100 == 99:
-                #print(i)
                 print("epoch {}:{} loss {}".format(epoch,i, cum_loss))
-                print(abs_rewards)
                 cum_loss = 0.0
                 print("check pointing")
                 torch.save(reward_net.state_dict(), checkpoint_dir)
     print("finished training")
     writer.close()
-
-
 
 
 def calc_accuracy(reward_network, training_inputs, training_outputs):
@@ -387,7 +282,6 @@ def calc_accuracy(reward_network, training_inputs, training_outputs):
             if pred_label.item() == label:
                 num_correct += 1.
     return num_correct / len(training_inputs)
-
 
 
 def predict_reward_sequence(net, traj):
@@ -415,14 +309,8 @@ if __name__=="__main__":
 
     parser.add_argument('--data_dir', help="where atari-head data is located")
     parser.add_argument('--gaze_loss', default=None, type=str, help="type of gaze loss function: sinkhorn, exact, coverage, KL, None")
-    parser.add_argument('--motion_loss', default=None, type=str, help="type of motion loss function: sinkhorn, exact, coverage, KL, None")
     parser.add_argument('--gaze_reg', default=0.01, type=float, help="gaze loss multiplier")
-    # parser.add_argument('--metric', default='rewards', help="metric to compare paired trajectories performance: rewards or returns")
-    parser.add_argument('--gaze_dropout', default=False, action='store_true', help="use gaze modulated dropout or not")
-    parser.add_argument('--motion', default=False, action='store_true', help="use motion as ground truth gaze")
     parser.add_argument('--gaze_conv_layer', default=4, type=int, help='the convlayer of the reward network to which gaze should be compared')
-    parser.add_argument('--mask_scores', default=False,
-                        action='store_true', help="mask scores on game screen or not")
 
 
     args = parser.parse_args()
@@ -439,7 +327,6 @@ if __name__=="__main__":
         env_id = env_name[0].upper() + env_name[1:] + "NoFrameskip-v4"
 
     env_type = "atari"
-    print(env_type)
     #set seeds
     seed = int(args.seed)
     torch.manual_seed(seed)
@@ -459,13 +346,10 @@ if __name__=="__main__":
     stochastic = True
 
     # gaze-related arguments
-    use_motion = args.motion
-    use_gaze = args.gaze_dropout or (args.gaze_loss is not None)
+    use_gaze = args.gaze_loss
     gaze_loss_type = args.gaze_loss
     gaze_reg = args.gaze_reg
-    mask_score = args.mask_scores
     gaze_conv_layer = args.gaze_conv_layer
-    gaze_dropout = args.gaze_dropout
     print('*************** GAZE: ',use_gaze,'****************')
 
     env = make_vec_env(env_id, 'atari', 1, seed,
@@ -494,24 +378,12 @@ if __name__=="__main__":
     max_snippet_length = min(np.min(demo_lengths), maximum_snippet_length)
     print("max snippet length", max_snippet_length)
 
-    print(len(learning_returns))
-    print(len(demonstrations))
-    print([a[0] for a in zip(learning_returns, demonstrations)])
     demonstrations = [x for _, x in sorted(zip(learning_returns,demonstrations), key=lambda pair: pair[0])]
     learning_gaze = [x for _, x in sorted(zip(learning_returns,learning_gaze), key=lambda pair: pair[0])]
-
-    #print([len(x) for x in demonstrations], [len(y) for y in learning_gaze7])
-    #exit(0)
-
     sorted_returns = sorted(learning_returns)
-    print(sorted_returns)
     
-    # print('demo before creating data: ', demonstrations[0].shape)
     training_data = create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, learning_gaze, use_gaze)
     training_obs, training_labels, training_gaze = training_data
-    # print('demo after creating data: ', training_obs[0].shape)
-    #print(len(training_obs[0][0]), len(training_obs[0][1]), len(training_gaze7[0][0]), len(training_gaze7[0][1])) 
-    #exit(0)
 
     print("num training_obs", len(training_obs))
     print("num_labels", len(training_labels))
@@ -524,7 +396,6 @@ if __name__=="__main__":
     optimizer = optim.Adam(reward_net.parameters(),  lr=lr, weight_decay=weight_decay)
     learn_reward(reward_net, optimizer, training_data, num_iter, l1_reg, args.reward_model_path, gaze_loss_type, gaze_reg, gaze_conv_layer)
     torch.cuda.empty_cache() 
-
 
     #save reward network
     torch.save(reward_net.state_dict(), args.reward_model_path)
