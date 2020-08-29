@@ -18,7 +18,7 @@ from run_test import *
 # from baselines.common.trex_utils import preprocess
 
 from cnn import Net
-import atari_head_dataset as ahd 
+# import atari_head_dataset as ahd 
 import utils
 from tensorboardX import SummaryWriter
 
@@ -350,7 +350,7 @@ if __name__=="__main__":
     data_dir = args.data_dir
     dataset = ahd.AtariHeadDataset(env_name, data_dir)
 
-    
+    print('preparing data..')
     demonstrations, learning_returns, learning_rewards, _ = utils.get_preprocessed_trajectories(env_name, dataset, data_dir)
 
     # if use_motion:
@@ -367,6 +367,7 @@ if __name__=="__main__":
     learning_gaze = [x for _, x in sorted(zip(learning_returns,learning_gaze), key=lambda pair: pair[0])]
     sorted_returns = sorted(learning_returns)
     
+    print('collecting traj snippets...')
     training_data = create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, learning_gaze, use_gaze)
     training_obs, training_labels, training_gaze = training_data
 
@@ -379,6 +380,7 @@ if __name__=="__main__":
     reward_net.to(device)
     import torch.optim as optim
     optimizer = optim.Adam(reward_net.parameters(),  lr=lr, weight_decay=weight_decay)
+    print('learning reward function...')
     learn_reward(reward_net, optimizer, training_data, num_iter, l1_reg, args.reward_model_path, gaze_loss_type, gaze_reg, gaze_conv_layer)
     torch.cuda.empty_cache() 
 

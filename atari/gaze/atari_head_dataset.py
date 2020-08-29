@@ -74,7 +74,7 @@ class AtariHeadDataset():
                   if path.isdir(path.join(d, o))]
 
         # discard trial numbers <180 (episode # not recorded)
-        # trial_nums = [t for t in trial_nums if t >= 180]
+        trial_nums = [t for t in trial_nums if t >= 180]
 
         # trajectory folder names for the chosen env
         valid_trials = [t for t in trials if int(
