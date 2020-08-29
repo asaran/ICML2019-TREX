@@ -364,7 +364,7 @@ if __name__=="__main__":
     print("max snippet length", max_snippet_length)
 
     demonstrations = [x for _, x in sorted(zip(learning_returns,demonstrations), key=lambda pair: pair[0])]
-    learning_gaze = [x for _, x in sorted(zip(learning_returns,learning_gaze), key=lambda pair: pair[0])]
+    # learning_gaze = [x for _, x in sorted(zip(learning_returns,learning_gaze), key=lambda pair: pair[0])]
     sorted_returns = sorted(learning_returns)
     
     print('collecting traj snippets...')
