@@ -21,6 +21,8 @@ import os.path as path
 import math
 
 # creating ground truth gaze heatmap from gaze coordinates
+
+
 class DatasetWithHeatmap:
     def __init__(self, GHmap=None, heatmap_shape=14):
         self.frameid2pos = None
@@ -28,23 +30,18 @@ class DatasetWithHeatmap:
         self.NUM_ACTION = 18
         self.xSCALE, self.ySCALE = 8, 4  # was 6,3
         self.SCR_W, self.SCR_H = 160*self.xSCALE, 210*self.ySCALE
-        # self.SCR_W, self.SCR_H = 160, 210
         self.train_size = 10
         self.HEATMAP_SHAPE = heatmap_shape
-        # self.asc_file = '/home/akanksha/learning-rewards-of-learners/data/dummy/spaceinvaders/644_KD_7692518_Sep-05-09-09-52.asc'
         self.sigmaH = 28.50 * self.HEATMAP_SHAPE / self.SCR_H
         self.sigmaW = 44.58 * self.HEATMAP_SHAPE / self.SCR_W
 
     def createGazeHeatmap(self, gaze_coords, heatmap_shape, viz=False, asc=False, asc_file=''):
-        print('gaze_coords length: ',len(gaze_coords))
+        print('gaze_coords length: ', len(gaze_coords))
         if not asc:
             self.frameid2pos = self.get_gaze_data(gaze_coords)
         else:
-            # testing asc file instead of gaze coords from txt
-            self.frameid2pos, _, _, _, _ = self.read_gaze_data_asc_file(asc_file)         # print(self.frameid2pos.keys())
-        # f=open('coords.txt','w')
-        # f.write(str(self.frameid2pos))
-        # f.close()
+            self.frameid2pos, _, _, _, _ = self.read_gaze_data_asc_file(
+                asc_file)
 
         self.train_size = len(self.frameid2pos.keys())
         self.HEATMAP_SHAPE = heatmap_shape
@@ -61,15 +58,14 @@ class DatasetWithHeatmap:
             tot_count += len(self.frameid2pos[fid])
             if asc:
                 bad_count += self.convert_gaze_pos_to_heap_map(
-                self.frameid2pos[fid], out=self.GHmap[i])
+                    self.frameid2pos[fid], out=self.GHmap[i])
             else:
                 bad_count += self.convert_gaze_coords_to_heap_map(
-                self.frameid2pos[fid], out=self.GHmap[i])
+                    self.frameid2pos[fid], out=self.GHmap[i])
 
         # print("Bad gaze (x,y) sample: %d (%.2f%%, total gaze sample: %d)" % (bad_count, 100*float(bad_count)/tot_count, tot_count))
         # print("'Bad' means the gaze position is outside the 160*210 screen")
 
-        
         self.GHmap = self.preprocess_gaze_heatmap(0).astype(np.float32)
 
         # normalizing such that values range between 0 and 1
@@ -81,25 +77,22 @@ class DatasetWithHeatmap:
 
             if viz:
                 cv2.imwrite('gazeGT/viz/'+str(i)+'.png', self.GHmap[i]*255)
-            
-        # print("Done. BIU.convert_gaze_pos_to_heap_map() and convolution used: %.1fs" % (time.time()-t1))
+
         return self.GHmap
 
     def get_gaze_data(self, gaze_coords):
         frameid2pos = {}
         frame_id = 0
         for gaze_list in gaze_coords:
-            # math.isnan(item)?
             isnan = [x for x in gaze_list if math.isnan(x)]
-            if len(isnan)>0:
+            if len(isnan) > 0:
                 frameid2pos[frame_id] = []
-                frame_id+=1
+                frame_id += 1
                 continue
-            #print('len gaze list:',len(gaze_list), gaze_list)
             gaze_xy_list = []
-            for i in range(0,len(gaze_list),2):
-                x,y = gaze_list[i]*self.xSCALE, gaze_list[i+1]*self.ySCALE
-                gaze_xy_list.append((x,y))
+            for i in range(0, len(gaze_list), 2):
+                x, y = gaze_list[i]*self.xSCALE, gaze_list[i+1]*self.ySCALE
+                gaze_xy_list.append((x, y))
             frameid2pos[frame_id] = gaze_xy_list
             frame_id += 1
 
@@ -112,12 +105,10 @@ class DatasetWithHeatmap:
             if len(v) < 10:
                 few_cnt += 1
         # print ("Warning:  %d frames have less than 10 gaze samples. (%.1f%%, total frame: %d)" % \
-        # (few_cnt, 100.0*few_cnt/len(frameid2pos), len(frameid2pos)))
 
         return frameid2pos
 
-
-    def read_gaze_data_asc_file(self,fname):
+    def read_gaze_data_asc_file(self, fname):
         """ This function reads a ASC file and returns 
             a dictionary mapping frame ID to a list of gaze positions,
             a dictionary mapping frame ID to action """
@@ -127,30 +118,34 @@ class DatasetWithHeatmap:
         frameid, xpos, ypos = "BEFORE-FIRST-FRAME", None, None
         frameid2pos = {frameid: []}
         frameid2action = {frameid: None}
-        frameid2duration = {frameid: None} 
+        frameid2duration = {frameid: None}
         frameid2unclipped_reward = {frameid: None}
         frameid2episode = {frameid: None}
         start_timestamp = 0
-        scr_msg = re.compile(r"MSG\s+(\d+)\s+SCR_RECORDER FRAMEID (\d+) UTID (\w+)")
-        freg = r"[-+]?[0-9]*\.?[0-9]+" # regex for floating point numbers
+        scr_msg = re.compile(
+            r"MSG\s+(\d+)\s+SCR_RECORDER FRAMEID (\d+) UTID (\w+)")
+        freg = r"[-+]?[0-9]*\.?[0-9]+"  # regex for floating point numbers
         gaze_msg = re.compile(r"(\d+)\s+(%s)\s+(%s)" % (freg, freg))
-        act_msg = re.compile(r"MSG\s+(\d+)\s+key_pressed atari_action (\d+)")    
+        act_msg = re.compile(r"MSG\s+(\d+)\s+key_pressed atari_action (\d+)")
         reward_msg = re.compile(r"MSG\s+(\d+)\s+reward (\d+)")
         episode_msg = re.compile(r"MSG\s+(\d+)\s+episode (\d+)")
 
-        for (i,line) in enumerate(lines):
+        for (i, line) in enumerate(lines):
             match_sample = gaze_msg.match(line)
             if match_sample:
-                timestamp, xpos, ypos = match_sample.group(1), match_sample.group(2), match_sample.group(3)
+                timestamp, xpos, ypos = match_sample.group(
+                    1), match_sample.group(2), match_sample.group(3)
                 xpos, ypos = float(xpos), float(ypos)
-                frameid2pos[frameid].append((xpos,ypos))
+                frameid2pos[frameid].append((xpos, ypos))
                 continue
 
             match_scr_msg = scr_msg.match(line)
-            if match_scr_msg: # when a new id is encountered
-                old_frameid = frameid 
-                timestamp, frameid, UTID = match_scr_msg.group(1), match_scr_msg.group(2), match_scr_msg.group(3)
-                frameid2duration[old_frameid] = int(timestamp) - start_timestamp 
+            if match_scr_msg:  # when a new id is encountered
+                old_frameid = frameid
+                timestamp, frameid, UTID = match_scr_msg.group(
+                    1), match_scr_msg.group(2), match_scr_msg.group(3)
+                frameid2duration[old_frameid] = int(
+                    timestamp) - start_timestamp
                 start_timestamp = int(timestamp)
                 frameid = self.make_unique_frame_id(UTID, frameid)
                 frameid2pos[frameid] = []
@@ -159,40 +154,49 @@ class DatasetWithHeatmap:
 
             match_action = act_msg.match(line)
             if match_action:
-                timestamp, action_label = match_action.group(1), match_action.group(2)
+                timestamp, action_label = match_action.group(
+                    1), match_action.group(2)
                 if frameid2action[frameid] is None:
                     frameid2action[frameid] = int(action_label)
                 else:
-                    print ("Warning: there is more than 1 action for frame id %s. Not supposed to happen." % str(frameid))
+                    print("Warning: there is more than 1 action for frame id %s. Not supposed to happen." % str(
+                        frameid))
                 continue
 
             match_reward = reward_msg.match(line)
             if match_reward:
-                timestamp, reward = match_reward.group(1), match_reward.group(2)
+                timestamp, reward = match_reward.group(
+                    1), match_reward.group(2)
                 if frameid not in frameid2unclipped_reward:
                     frameid2unclipped_reward[frameid] = int(reward)
                 else:
-                    print ("Warning: there is more than 1 reward for frame id %s. Not supposed to happen." % str(frameid))
+                    print("Warning: there is more than 1 reward for frame id %s. Not supposed to happen." % str(
+                        frameid))
                 continue
 
             match_episode = episode_msg.match(line)
             if match_episode:
-                timestamp, episode = match_episode.group(1), match_episode.group(2)
-                assert frameid not in frameid2episode, "ERROR: there is more than 1 episode for frame id %s. Not supposed to happen." % str(frameid)
-                frameid2episode[frameid] = int(episode) 
+                timestamp, episode = match_episode.group(
+                    1), match_episode.group(2)
+                assert frameid not in frameid2episode, "ERROR: there is more than 1 episode for frame id %s. Not supposed to happen." % str(
+                    frameid)
+                frameid2episode[frameid] = int(episode)
                 continue
 
-        frameid2pos[frameid] = [] # throw out gazes after the last frame, because the game has ended but eye tracker keeps recording
+        # throw out gazes after the last frame, because the game has ended but eye tracker keeps recording
+        frameid2pos[frameid] = []
 
-        if len(frameid2pos) < 1000: # simple sanity check
-            print ("Warning: did you provide the correct ASC file? Because the data for only %d frames is detected" % (len(frameid2pos)))
+        if len(frameid2pos) < 1000:  # simple sanity check
+            print("Warning: did you provide the correct ASC file? Because the data for only %d frames is detected" % (
+                len(frameid2pos)))
             raw_input("Press any key to continue")
 
         few_cnt = 0
         for v in frameid2pos.values():
-            if len(v) < 10: few_cnt += 1
-        print ("Warning:  %d frames have less than 10 gaze samples. (%.1f%%, total frame: %d)" % \
-                (few_cnt, 100.0*few_cnt/len(frameid2pos), len(frameid2pos)))
+            if len(v) < 10:
+                few_cnt += 1
+        print("Warning:  %d frames have less than 10 gaze samples. (%.1f%%, total frame: %d)" %
+              (few_cnt, 100.0*few_cnt/len(frameid2pos), len(frameid2pos)))
         return frameid2pos, frameid2action, frameid2duration, frameid2unclipped_reward, frameid2episode
 
     # bg_prob_density seems to hurt accuracy. Better set it to 0
@@ -261,14 +265,13 @@ class DatasetWithHeatmap:
                     bad_count += 1
         return bad_count
 
-
     def convert_gaze_pos_to_heap_map(self, gaze_pos_list, out):
-        h,w = out.shape[0], out.shape[1]
+        h, w = out.shape[0], out.shape[1]
         bad_count = 0
-        for (x,y) in gaze_pos_list: 
+        for (x, y) in gaze_pos_list:
             try:
                 out[int(y/self.SCR_H*h), int(x/self.SCR_W*w)] += 1
-            except IndexError: # the computed X,Y position is not in the gaze heat map
+            except IndexError:  # the computed X,Y position is not in the gaze heat map
                 bad_count += 1
         return bad_count
 
@@ -285,7 +288,6 @@ class PretrainedHeatmap():
         # height * width * channel This cannot read from file and needs to be provided here
         self.SHAPE = (84, 84, k)
         self.meanfile = meanfile_path
-        # self.img_dir = path.join(BASE_FILE_NAME, VAL_DATASET[0])
 
         MU.BMU.save_GPU_mem_keras()
         MU.keras_model_serialization_bug_fix()
@@ -344,7 +346,7 @@ class PretrainedHeatmap():
         opt = K.optimizers.Adadelta(lr=1.0, rho=0.95, epsilon=1e-08, decay=0.0)
         self.model.compile(loss=MU.my_kld, optimizer=opt, metrics=[MU.NSS])
 
-    def normalize(self,obs):
+    def normalize(self, obs):
         max_val, min_val = np.max(obs), np.min(obs)
         if(max_val-min_val != 0):
             norm_map = (obs-min_val)/(max_val-min_val)
@@ -353,36 +355,33 @@ class PretrainedHeatmap():
         return norm_map
 
     def get_heatmap(self, stacked_img, shape, viz=False):
-        mean = np.load(self.meanfile) #shape: #(1,)
+        mean = np.load(self.meanfile)  # shape: #(1,)
         traj_length = len(stacked_img)
 
         stacked_obs = np.zeros((traj_length, 84, 84, 4))
         for i in range(traj_length):
             # convert stacked frame list (for a trajectory) into a batch
-            img_np = stacked_img[i].squeeze() # (1,84,84,4) --> (84,84,4)
-
-            # img_np = np.dot(img_np, [0.299, 0.587, 0.114])  # convert to grayscale
-            # img_np = misc.imresize(img_np, [84, 84], interp='bilinear')
-            # img_np = np.expand_dims(img_np.squeeze(), axis=2)
+            img_np = stacked_img[i].squeeze()  # (1,84,84,4) --> (84,84,4)
             img_np = img_np.astype(np.float32) / 255.0
-            
-            img_np -= mean 
+
+            img_np -= mean
             stacked_obs[i, :, :, :] = img_np.squeeze()
 
         self.model.load_weights(self.model_path)
         val_predict = self.model.predict(stacked_obs)
-        # print(val_predict.shape)
-        # TODO(Ruohan's way): subsample to desired shape for heatmap (meanpooling)
+        # subsample to desired shape for heatmap (meanpooling)
         output = np.zeros((traj_length, shape, shape))
         for i in range(traj_length):
-            heatmap = val_predict[i,:,:].squeeze()
+            heatmap = val_predict[i, :, :].squeeze()
             # Normalize predicted heatmap such that largest element is 1.0
             heatmap_norm = self.normalize(heatmap)
-            # print('max: ',np.max(heatmap)) #0.0018628561
-           
-            output[i,:,:] = self.normalize(misc.imresize(heatmap_norm, [shape,shape], interp='bilinear'))
+
+            output[i, :, :] = self.normalize(misc.imresize(
+                heatmap_norm, [shape, shape], interp='bilinear'))
             if viz:
-                cv2.imwrite('gazeNetwork/viz/'+str(i)+'_out.png', output[i,:,:].squeeze()*255)
-                cv2.imwrite('gazeNetwork/viz/'+str(i)+'_pred.png', heatmap_norm*255)
+                cv2.imwrite('gazeNetwork/viz/'+str(i)+'_out.png',
+                            output[i, :, :].squeeze()*255)
+                cv2.imwrite('gazeNetwork/viz/'+str(i) +
+                            '_pred.png', heatmap_norm*255)
 
         return np.expand_dims(output, axis=3)

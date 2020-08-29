@@ -4,6 +4,8 @@ learned_models/*
 eval/*
 models/*
 viz/*
+gaze_videos/*
+videos/*
 submit_scripts/*.sh
 baselines/baselines/ppo2/__pycache__/*
 videos/*
