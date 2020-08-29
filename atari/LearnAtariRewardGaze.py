@@ -28,58 +28,6 @@ from gaze import atari_head_dataset as ahd
 from baselines.common.trex_utils import preprocess, mask_score
 from gaze.coverage import *
 
-def get_human_demos(env, env_name, dataset, data_dir, use_gaze, use_human_gaze=False):
-    print("get human demos from the atari head dataset:", data_dir)
-
-    demonstrations = []
-    learning_returns = []
-
-    # DONE: get demonstrations and returns from the recorded data
-    if use_human_gaze:
-        demos, learning_returns, _, learning_gaze = human_utils.get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze=True)
-    else:
-        demos, learning_returns, _ = human_utils.get_preprocessed_trajectories(env_name, dataset, data_dir)
-    
-    if use_gaze and not use_human_gaze:
-        # get gaze prediction
-        model_path = './gaze/pretrained_models/expert/' \
-            + env_name + '.hdf5'
-        meanfile_path = './gaze/pretrained_models/means/' + env_name + '.mean.npy'
-        h = gh.PretrainedHeatmap(env_name, model_path, meanfile_path)
-        heatmap_shape = 84
-
-    
-    episode_count = len(demos)
-    for i in range(episode_count):
-        trajectory = demos[i]
-        # acc_reward = learning_returns[i]
-        traj = []
-        for k,t in enumerate(trajectory):
-            ob, action = t
-
-            # print('ob: ', ob.shape) #(1,84,84,4)
-            ob_processed = mask_score(ob, env_name)
-            # print('ob processed: ',ob_processed.shape)  #(1,84,84,4)   
-
-            if use_gaze and not use_human_gaze:
-                gaze = h.get_heatmap(ob, heatmap_shape) # already preprocessed (normalized and masked)
-                traj.append((ob_processed,gaze))
-                # print('verifying: ', ob_processed.shape, action, gaze.shape) (1, 4, 84, 84) 0 (1, 84, 84)
-            elif use_gaze and use_human_gaze:
-                gaze = learning_gaze[i][k]
-                traj.append((ob_processed,gaze))
-            else:
-                traj.append((ob_processed))
-
-        print("traj length", len(traj))
-        # print("traj items: ", len(traj[0]))
-        demonstrations.append(traj)
-        # exit(1)
-    print("demo length", len(demonstrations))
-
-    print("Mean", np.mean(learning_returns), "Max", np.max(learning_returns))
-
-    return demonstrations, learning_returns, []
 
 def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, gaze_coords, use_gaze, use_human_gaze=False):
     #collect training data
@@ -241,7 +189,7 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
 
             #forward + backward + optimize
             if gaze_loss_type in ['KL', 'IG']:
-                outputs, abs_rewards, conv_map_i, conv_map_j = reward_network.forward(traj_i, traj_j, gaze_conv_layer)
+                outputs, abs_rewards, attn_map_i, attn_map_j = reward_network.forward(traj_i, traj_j, gaze_conv_layer)
             else:
                 outputs, abs_rewards, _, _ = reward_network.forward(traj_i, traj_j)	
             outputs = outputs.unsqueeze(0)
@@ -264,13 +212,9 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
                     # gaze_loss_j = get_gaze_KL_loss(gaze_j, torch.squeeze(conv_map_j))
 
 
-                    # 1x1 convolution followed by softmax to get collapsed and normalized conv output
-                    norm_operator = nn.Conv2d(64, 1, kernel_size=1, stride=1)
-                    if torch.cuda.is_available():
-                                    #print("Initializing Cuda Nets...")
-                                    norm_operator.cuda()
-                    attn_map_i = norm_operator(torch.squeeze(conv_map_i))
-                    attn_map_j = norm_operator(torch.squeeze(conv_map_j))
+                    
+                    # attn_map_i = norm_operator(torch.squeeze(conv_map_i))
+                    # attn_map_j = norm_operator(torch.squeeze(conv_map_j))
                     # print(attn_map.shape)
                     # attn_shape = torch.Size([attn_map.shape[0], attn_map.shape[1], 84,84])
                     attn_map_i = F.interpolate(attn_map_i, (84,84), mode="bilinear", align_corners=False)
