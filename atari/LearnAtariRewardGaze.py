@@ -29,7 +29,7 @@ from baselines.common.trex_utils import preprocess, mask_score
 from gaze.coverage import *
 
 
-def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, gaze_coords, use_gaze, use_human_gaze=False):
+def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, use_gaze, use_human_gaze=False):
     #collect training data
     max_traj_length = 0
     training_obs = []
@@ -68,9 +68,9 @@ def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_le
         traj_i = demonstrations[ti][si::step]  #slice(start,stop,step)
         traj_j = demonstrations[tj][sj::step]
         
-        if use_gaze:
-            gaze_i = gaze_coords[ti][si::step]
-            gaze_j = gaze_coords[tj][sj::step]
+        # if use_gaze:
+        #     gaze_i = gaze_coords[ti][si::step]
+        #     gaze_j = gaze_coords[tj][sj::step]
 
         # TODO: add gaze prediction for enduro
         
@@ -123,8 +123,10 @@ def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_le
         elif use_gaze and use_human_gaze:
             # gaze = learning_gaze[i][k]
             # traj.append((ob_processed,gaze))
-            gaze_i = gaze_coords[ti][ti_start:ti_start+rand_length:2]
-            gaze_j = gaze_coords[tj][tj_start:tj_start+rand_length:2]
+            # gaze_i = gaze_coords[ti][ti_start:ti_start+rand_length:2]
+            # gaze_j = gaze_coords[tj][tj_start:tj_start+rand_length:2]
+            print('not implemented yet')
+
         # else:
             # traj.append((ob_processed))
 
@@ -368,7 +370,7 @@ if __name__=="__main__":
     sorted_returns = sorted(learning_returns)
     
     print('collecting traj snippets...')
-    training_data = create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, learning_gaze, use_gaze)
+    training_data = create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, use_gaze)
     training_obs, training_labels, training_gaze = training_data
 
     print("num training_obs", len(training_obs))
