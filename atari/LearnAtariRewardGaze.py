@@ -351,7 +351,7 @@ if __name__=="__main__":
     dataset = ahd.AtariHeadDataset(env_name, data_dir)
 
     print('preparing data..')
-    demonstrations, learning_returns, learning_rewards, _ = utils.get_preprocessed_trajectories(env_name, dataset, data_dir)
+    demonstrations, learning_returns, learning_rewards = utils.get_preprocessed_trajectories(env_name, dataset, data_dir)
 
     # if use_motion:
     #     use_gaze=True
