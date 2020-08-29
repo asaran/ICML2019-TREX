@@ -378,7 +378,7 @@ if __name__=="__main__":
    
     # Now we create a reward network and optimize it using the training data.
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    reward_net = Net(gaze_dropout, gaze_loss_type)
+    reward_net = Net(gaze_loss_type)
     reward_net.to(device)
     import torch.optim as optim
     optimizer = optim.Adam(reward_net.parameters(),  lr=lr, weight_decay=weight_decay)
