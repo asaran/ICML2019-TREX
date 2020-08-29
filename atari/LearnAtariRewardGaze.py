@@ -15,20 +15,93 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from run_test import *
-from baselines.common.trex_utils import preprocess
+# from baselines.common.trex_utils import preprocess
 
 from cnn import Net
 import atari_head_dataset as ahd 
 import utils
 from tensorboardX import SummaryWriter
 
-def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, gaze_coords, use_gaze):
+from gaze import gaze_heatmap as gh
+from gaze import human_utils
+from gaze import atari_head_dataset as ahd
+from baselines.common.trex_utils import preprocess, mask_score
+from gaze.coverage import *
+
+def get_human_demos(env, env_name, dataset, data_dir, use_gaze, use_human_gaze=False):
+    print("get human demos from the atari head dataset:", data_dir)
+
+    demonstrations = []
+    learning_returns = []
+
+    # DONE: get demonstrations and returns from the recorded data
+    if use_human_gaze:
+        demos, learning_returns, _, learning_gaze = human_utils.get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze=True)
+    else:
+        demos, learning_returns, _ = human_utils.get_preprocessed_trajectories(env_name, dataset, data_dir)
+    
+    if use_gaze and not use_human_gaze:
+        # get gaze prediction
+        model_path = './gaze/pretrained_models/expert/' \
+            + env_name + '.hdf5'
+        meanfile_path = './gaze/pretrained_models/means/' + env_name + '.mean.npy'
+        h = gh.PretrainedHeatmap(env_name, model_path, meanfile_path)
+        heatmap_shape = 84
+
+    
+    episode_count = len(demos)
+    for i in range(episode_count):
+        trajectory = demos[i]
+        # acc_reward = learning_returns[i]
+        traj = []
+        for k,t in enumerate(trajectory):
+            ob, action = t
+
+            # print('ob: ', ob.shape) #(1,84,84,4)
+            ob_processed = mask_score(ob, env_name)
+            # print('ob processed: ',ob_processed.shape)  #(1,84,84,4)   
+
+            if use_gaze and not use_human_gaze:
+                gaze = h.get_heatmap(ob, heatmap_shape) # already preprocessed (normalized and masked)
+                traj.append((ob_processed,gaze))
+                # print('verifying: ', ob_processed.shape, action, gaze.shape) (1, 4, 84, 84) 0 (1, 84, 84)
+            elif use_gaze and use_human_gaze:
+                gaze = learning_gaze[i][k]
+                traj.append((ob_processed,gaze))
+            else:
+                traj.append((ob_processed))
+
+        print("traj length", len(traj))
+        # print("traj items: ", len(traj[0]))
+        demonstrations.append(traj)
+        # exit(1)
+    print("demo length", len(demonstrations))
+
+    print("Mean", np.mean(learning_returns), "Max", np.max(learning_returns))
+
+    return demonstrations, learning_returns, []
+
+def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, gaze_coords, use_gaze, use_human_gaze=False):
     #collect training data
     max_traj_length = 0
     training_obs = []
     training_labels = []
     training_gaze = []
     num_demos = len(demonstrations)
+
+    if use_human_gaze:
+        demos, learning_returns, _, learning_gaze = human_utils.get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze=True)
+    else:
+        demos, learning_returns, _ = human_utils.get_preprocessed_trajectories(env_name, dataset, data_dir)
+    
+    if use_gaze and not use_human_gaze:
+        # get gaze prediction
+        model_path = './gaze/pretrained_models/expert/' \
+            + env_name + '.hdf5'
+        meanfile_path = './gaze/pretrained_models/means/' + env_name + '.mean.npy'
+        h = gh.PretrainedHeatmap(env_name, model_path, meanfile_path)
+        heatmap_shape = 84
+
 
     #add full trajs (for use on Enduro)
     for n in range(num_trajs):
@@ -51,6 +124,8 @@ def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_le
             gaze_i = gaze_coords[ti][si::step]
             gaze_j = gaze_coords[tj][sj::step]
 
+        # TODO: add gaze prediction for enduro
+        
         if ti > tj:
             label = 0
         else:
@@ -85,9 +160,27 @@ def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_le
         traj_i = demonstrations[ti][ti_start:ti_start+rand_length:2] #skip every other framestack to reduce size
         traj_j = demonstrations[tj][tj_start:tj_start+rand_length:2]
 
-        if use_gaze:
+        # if use_gaze:
+        #     gaze_i = gaze_coords[ti][ti_start:ti_start+rand_length:2]
+        #     gaze_j = gaze_coords[tj][tj_start:tj_start+rand_length:2]
+
+        gaze_i, gaze_j = [], []
+        if use_gaze and not use_human_gaze:
+
+            # gaze = h.get_heatmap(ob, heatmap_shape) # already preprocessed (normalized and masked)
+            gaze_i = h.get_heatmap(traj_i, heatmap_shape) 
+            gaze_j = h.get_heatmap(traj_j, heatmap_shape) 
+            # traj.append((ob_processed,gaze))
+            # print('verifying: ', ob_processed.shape, action, gaze.shape) (1, 4, 84, 84) 0 (1, 84, 84)
+        elif use_gaze and use_human_gaze:
+            # gaze = learning_gaze[i][k]
+            # traj.append((ob_processed,gaze))
             gaze_i = gaze_coords[ti][ti_start:ti_start+rand_length:2]
             gaze_j = gaze_coords[tj][tj_start:tj_start+rand_length:2]
+        # else:
+            # traj.append((ob_processed))
+
+
 
         max_traj_length = max(max_traj_length, len(traj_i), len(traj_j))
         if ti > tj:
@@ -103,60 +196,6 @@ def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_le
     return training_obs, training_labels, training_gaze
 
 
-def get_gaze_exact_loss(true_gaze, conv_gaze): #order of 60
-    loss = 0
-    batch_size = true_gaze.shape[0]
-
-    # assert batch size for both conv and true gaze is the same
-    assert(batch_size==conv_gaze.shape[0])
-
-    coverage_loss = torch.sum(torch.mul(true_gaze,torch.abs(true_gaze-conv_gaze)))/batch_size
-    return coverage_loss
-
-
-def get_gaze_quadratic_coverage_loss(true_gaze, conv_gaze): # very high 10e15
-    loss = 0
-    batch_size = true_gaze.shape[0]
-
-    # assert batch size for both conv and true gaze is the same
-    assert(batch_size==conv_gaze.shape[0])
-    
-    #add epsilon=1e-10 to denominator for regularized QL
-    epsilon = 1e-10 # introduce epsilon to avoid log and division by zero error
-    conv_gaze = torch.clamp(conv_gaze, epsilon, 1)
-
-    loss = torch.sum(torch.mul(true_gaze,(torch.mul((torch.div(true_gaze,conv_gaze) - 1),(torch.div(true_gaze,conv_gaze) - 1)))))/batch_size
-    return loss
-
-def get_gaze_KL_loss(true_gaze, conv_gaze): # order of 60s
-    import torch.nn.functional as F
-    loss = 0
-    batch_size = true_gaze.shape[0]
-    print(true_gaze.shape)
-
-    # assert batch size for both conv and true gaze is the same
-    assert(batch_size==conv_gaze.shape[0])
-
-    epsilon = 1e-10 # introduce epsilon to avoid log and division by zero error
-    true_gaze2 = torch.clamp(true_gaze, epsilon, 1)
-    conv_gaze = torch.clamp(conv_gaze, epsilon, 1)
-    return torch.sum(torch.mul(torch.mul(true_gaze2,true_gaze),torch.log(torch.div(true_gaze2 ,conv_gaze))))/batch_size
-
-
-# differentiable approximation of Earth Mover's Distance
-def get_gaze_sinkhorn_loss(true_gaze, conv_gaze):
-    from sinkhorn import SinkhornDistance
-    loss = 0
-    batch_size = true_gaze.shape[0]
-
-    # assert batch size for both conv and true gaze is the same
-    assert(batch_size==conv_gaze.shape[0])
-
-    sinkhorn = SinkhornDistance(eps=0.1, max_iter=100, reduction='sum')
-    dist, P, C = sinkhorn(conv_gaze, true_gaze) # moving particles from conv_gaze to true_gaze
-    sinkhorn = dist/batch_size
-    return sinkhorn
-    
 
 
 # Train the network
@@ -177,13 +216,13 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
  
     training_inputs, training_outputs, training_gaze = training_data
 
-    if gaze_loss_type in ['sinkhorn', 'quadratic', 'KL', 'exact']:
+    if gaze_loss_type in ['KL', 'IG']:
         training_data = list(zip(training_inputs, training_outputs, training_gaze))
     else:
         training_data = list(zip(training_inputs, training_outputs))
     for epoch in range(num_iter):
         np.random.shuffle(training_data)
-        if gaze_loss_type in ['sinkhorn', 'quadratic', 'KL', 'exact']:
+        if gaze_loss_type in ['KL', 'IG']:
             training_obs, training_labels, training_gaze = zip(*training_data)
         else:
             training_obs, training_labels = zip(*training_data)
@@ -201,7 +240,7 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
             optimizer.zero_grad()
 
             #forward + backward + optimize
-            if gaze_loss_type in ['sinkhorn', 'quadratic', 'KL', 'exact']:
+            if gaze_loss_type in ['KL', 'IG']:
                 outputs, abs_rewards, conv_map_i, conv_map_j = reward_network.forward(traj_i, traj_j, gaze_conv_layer)
             else:
                 outputs, abs_rewards, _, _ = reward_network.forward(traj_i, traj_j)	
@@ -211,40 +250,39 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
             loss = output_loss + l1_reg * abs_rewards
             writer.add_scalar('CE_loss', loss.item(), epoch*len(training_labels)+i)
 
-            if gaze_loss_type in ['sinkhorn', 'quadratic', 'KL', 'exact']:
+            if gaze_loss_type in ['KL', 'IG']:
                 # ground truth human gaze maps (7x7)
                 gaze_i, gaze_j = training_gaze[i]
                 gaze_i = torch.squeeze(torch.tensor(gaze_i, device=device)) # list of torch tensors
                 gaze_j = torch.squeeze(torch.tensor(gaze_j, device=device))
 
-                if gaze_loss_type == 'quadratic':
-                    gaze_loss_i = get_gaze_quadratic_coverage_loss(gaze_i, torch.squeeze(conv_map_i))
-                    gaze_loss_j = get_gaze_quadratic_coverage_loss(gaze_j, torch.squeeze(conv_map_j))
-
-                    gaze_loss_total = (gaze_loss_i + gaze_loss_j)
-                    #print('gaze loss: ', gaze_loss_total.data)  
-                    writer.add_scalar('quadratic_coverage_loss', gaze_loss_total.item(), epoch*len(training_labels)+i) 
-
-                elif gaze_loss_type == 'sinkhorn':
-                    gaze_loss_i = get_gaze_sinkhorn_loss(gaze_i, torch.squeeze(conv_map_i))
-                    gaze_loss_j = get_gaze_sinkhorn_loss(gaze_j, torch.squeeze(conv_map_j))
-
-                    gaze_loss_total = (gaze_loss_i + gaze_loss_j)
-                    writer.add_scalar('sinkhorn_loss', gaze_loss_total.item(), epoch*len(training_labels)+i) 
 
                 if gaze_loss_type == 'KL':
-                    gaze_loss_i = get_gaze_KL_loss(gaze_i, torch.squeeze(conv_map_i))
-                    gaze_loss_j = get_gaze_KL_loss(gaze_j, torch.squeeze(conv_map_j))
+                    eps = 0.0001
+                    # N=84*84
+                    # gaze_loss_i = get_gaze_KL_loss(gaze_i, torch.squeeze(conv_map_i))
+                    # gaze_loss_j = get_gaze_KL_loss(gaze_j, torch.squeeze(conv_map_j))
+
+
+                    # 1x1 convolution followed by softmax to get collapsed and normalized conv output
+                    norm_operator = nn.Conv2d(64, 1, kernel_size=1, stride=1)
+                    if torch.cuda.is_available():
+                                    #print("Initializing Cuda Nets...")
+                                    norm_operator.cuda()
+                    attn_map_i = norm_operator(torch.squeeze(conv_map_i))
+                    attn_map_j = norm_operator(torch.squeeze(conv_map_j))
+                    # print(attn_map.shape)
+                    # attn_shape = torch.Size([attn_map.shape[0], attn_map.shape[1], 84,84])
+                    attn_map_i = F.interpolate(attn_map_i, (84,84), mode="bilinear", align_corners=False)
+                    attn_map_j = F.interpolate(attn_map_j, (84,84), mode="bilinear", align_corners=False)
+
+                    kl_i = computeKL_batch(attn_map_i, gaze_i)
+                    kl_j = computeKL_batch(attn_map_j, gaze_j)
+                    gaze_loss_i = torch.sum(kl_i)
+                    gaze_loss_j = torch.sum(kl_j)
 
                     gaze_loss_total = (gaze_loss_i + gaze_loss_j)
                     writer.add_scalar('KL_loss', gaze_loss_total.item(), epoch*len(training_labels)+i) 
-
-                if gaze_loss_type == 'exact':
-                    gaze_loss_i = get_gaze_exact_loss(gaze_i, torch.squeeze(conv_map_i))
-                    gaze_loss_j = get_gaze_exact_loss(gaze_j, torch.squeeze(conv_map_j))
-
-                    gaze_loss_total = (gaze_loss_i + gaze_loss_j)  
-                    writer.add_scalar('exact_match_loss', gaze_loss_total.item(), epoch*len(training_labels)+i)  
 
                 loss += gaze_reg * gaze_loss_total
                 writer.add_scalar('total_loss', loss.item(), epoch*len(training_labels)+i)
@@ -367,11 +405,13 @@ if __name__=="__main__":
     # Use Atari-HEAD human demos
     data_dir = args.data_dir
     dataset = ahd.AtariHeadDataset(env_name, data_dir)
-    demonstrations, learning_returns, learning_rewards, learning_gaze = utils.get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze, gaze_conv_layer, use_motion, mask_score)
 
-    if use_motion:
-        use_gaze=True
-        gaze_loss_type = args.motion_loss
+    
+    demonstrations, learning_returns, learning_rewards, _ = utils.get_preprocessed_trajectories(env_name, dataset, data_dir)
+
+    # if use_motion:
+    #     use_gaze=True
+    #     gaze_loss_type = args.motion_loss
 
     #sort the demonstrations according to ground truth reward to simulate ranked demos
     demo_lengths = [len(d) for d in demonstrations]
