@@ -7,7 +7,7 @@ import numpy as np
 
 
 class Net(nn.Module):
-    def __init__(self, gaze_dropout, gaze_loss_type):
+    def __init__(self, gaze_loss_type):
         super().__init__()
 
         self.conv1 = nn.Conv2d(4, 16, 7, stride=3)  # 26x26
@@ -17,7 +17,7 @@ class Net(nn.Module):
         self.fc1 = nn.Linear(784, 64)
         self.fc2 = nn.Linear(64, 1)
 
-        self.gaze_dropout = gaze_dropout
+        #self.gaze_dropout = gaze_dropout
         self.gaze_loss_type = gaze_loss_type
 
     def cum_return(self, traj, use_gaze=False):
