@@ -230,7 +230,7 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
                     gaze_loss_total = (gaze_loss_i + gaze_loss_j)
                     writer.add_scalar('KL_loss', gaze_loss_total.item(), epoch*len(training_labels)+i) 
 
-                loss += gaze_reg * gaze_loss_total
+                loss = (1-gaze_reg)*loss + gaze_reg * gaze_loss_total
                 writer.add_scalar('total_loss', loss.item(), epoch*len(training_labels)+i)
 
             loss.backward()
