@@ -58,7 +58,8 @@ class Net(nn.Module):
         if self.gaze_loss_type is not None and use_gaze:
             # sum over all dimensions of the conv map
             gaze_conv = x4
-            conv_map = gaze_conv.sum(dim=1)
+            conv_map = gaze_conv
+            #conv_map = gaze_conv.sum(dim=1)
 
             # normalize the conv map
             # traj_length = traj.shape[0]
@@ -73,7 +74,7 @@ class Net(nn.Module):
             # x_norm = (conv_map - min_x)/(max_x - min_x)
 
             # 1x1 convolution followed by softmax to get collapsed and normalized conv output
-            norm_operator = nn.Conv2d(64, 1, kernel_size=1, stride=1)
+            norm_operator = nn.Conv2d(16, 1, kernel_size=1, stride=1)
             if torch.cuda.is_available():
                 #print("Initializing Cuda Nets...")
                 norm_operator.cuda()

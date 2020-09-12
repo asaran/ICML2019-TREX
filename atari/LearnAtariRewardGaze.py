@@ -191,7 +191,7 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
 
             #forward + backward + optimize
             if gaze_loss_type in ['KL', 'IG']:
-                outputs, abs_rewards, attn_map_i, attn_map_j = reward_network.forward(traj_i, traj_j, gaze_conv_layer)
+                outputs, abs_rewards, conv_map_i, conv_map_j = reward_network.forward(traj_i, traj_j, gaze_conv_layer)
             else:
                 outputs, abs_rewards, _, _ = reward_network.forward(traj_i, traj_j)	
             outputs = outputs.unsqueeze(0)
@@ -213,11 +213,11 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
                     # gaze_loss_i = get_gaze_KL_loss(gaze_i, torch.squeeze(conv_map_i))
                     # gaze_loss_j = get_gaze_KL_loss(gaze_j, torch.squeeze(conv_map_j))
 
-
-                    
-                    # attn_map_i = norm_operator(torch.squeeze(conv_map_i))
-                    # attn_map_j = norm_operator(torch.squeeze(conv_map_j))
-                    # print(attn_map.shape)
+                    print('shapes of conv maps...')
+                    print(conv_map_i.shape)
+                    attn_map_i = torch.unsqueeze(torch.squeeze(conv_map_i),1)
+                    attn_map_j = torch.unsqueeze(torch.squeeze(conv_map_j),1)
+                    print(attn_map_i.shape)
                     # attn_shape = torch.Size([attn_map.shape[0], attn_map.shape[1], 84,84])
                     attn_map_i = F.interpolate(attn_map_i, (84,84), mode="bilinear", align_corners=False)
                     attn_map_j = F.interpolate(attn_map_j, (84,84), mode="bilinear", align_corners=False)
