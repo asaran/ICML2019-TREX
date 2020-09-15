@@ -3,11 +3,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-from utils import get_gaze_heatmap
+# from utils import get_gaze_heatmap
 
 
 class Net(nn.Module):
-    def __init__(self, gaze_dropout, gaze_loss_type):
+    def __init__(self, gaze_loss_type):
         super().__init__()
 
         self.conv1 = nn.Conv2d(4, 16, 7, stride=3)  # 26x26
@@ -17,10 +17,10 @@ class Net(nn.Module):
         self.fc1 = nn.Linear(784, 64)
         self.fc2 = nn.Linear(64, 1)
 
-        self.gaze_dropout = gaze_dropout
+        #self.gaze_dropout = gaze_dropout
         self.gaze_loss_type = gaze_loss_type
 
-    def cum_return(self, traj, gaze_conv_layer=0):
+    def cum_return(self, traj, use_gaze=False):
         '''calculate cumulative return of trajectory'''
         sum_rewards = 0
         sum_abs_rewards = 0
@@ -39,39 +39,49 @@ class Net(nn.Module):
         # prepare conv map to be returned for gaze loss
         conv_map_traj = []
         conv_map_stacked = torch.tensor([[]])
-        if gaze_conv_layer == 1:
-            gaze_conv = x1
-            gaze_size = 26
-        elif gaze_conv_layer == 2:
-            gaze_conv = x2
-            gaze_size = 11
-        elif gaze_conv_layer == 3:
-            gaze_conv = x3
-            gaze_size = 9
-        elif gaze_conv_layer == 4:
-            gaze_conv = x4
-            gaze_size = 7
-        else:
-            print('invalid gaze_conv_layer. Must be between 1-4.')
-            # exit(0)
+        # if gaze_conv_layer == 1:
+        #     gaze_conv = x1
+        #     gaze_size = 26
+        # elif gaze_conv_layer == 2:
+        #     gaze_conv = x2
+        #     gaze_size = 11
+        # elif gaze_conv_layer == 3:
+        #     gaze_conv = x3
+        #     gaze_size = 9
+        # elif gaze_conv_layer == 4:
+        #     gaze_conv = x4
+        #     gaze_size = 7
+        # else:
+        #     print('invalid gaze_conv_layer. Must be between 1-4.')
+        #     # exit(0)
 
-        if self.gaze_loss_type is not None and gaze_conv_layer != 0:
+        if self.gaze_loss_type is not None and use_gaze:
             # sum over all dimensions of the conv map
-            conv_map = gaze_conv.sum(dim=1)
+            gaze_conv = x4
+            conv_map = gaze_conv
+            #conv_map = gaze_conv.sum(dim=1)
 
             # normalize the conv map
-            traj_length = traj.shape[0]
-            min_x = torch.min(torch.min(conv_map, dim=1)[0], dim=1)[0]
-            max_x = torch.max(torch.max(conv_map, dim=1)[0], dim=1)[0]
+            # traj_length = traj.shape[0]
+            # min_x = torch.min(torch.min(conv_map, dim=1)[0], dim=1)[0]
+            # max_x = torch.max(torch.max(conv_map, dim=1)[0], dim=1)[0]
 
-            min_x = min_x.reshape(traj_length, 1).repeat(
-                1, gaze_size).unsqueeze(-1).expand(traj_length, gaze_size, gaze_size)
-            max_x = max_x.reshape(traj_length, 1).repeat(
-                1, gaze_size).unsqueeze(-1).expand(traj_length, gaze_size, gaze_size)
+            # min_x = min_x.reshape(traj_length, 1).repeat(
+            #     1, gaze_size).unsqueeze(-1).expand(traj_length, gaze_size, gaze_size)
+            # max_x = max_x.reshape(traj_length, 1).repeat(
+            #     1, gaze_size).unsqueeze(-1).expand(traj_length, gaze_size, gaze_size)
 
-            x_norm = (conv_map - min_x)/(max_x - min_x)
-            conv_map_traj.append(x_norm)
+            # x_norm = (conv_map - min_x)/(max_x - min_x)
 
+            # 1x1 convolution followed by softmax to get collapsed and normalized conv output
+            norm_operator = nn.Conv2d(16, 1, kernel_size=1, stride=1)
+            if torch.cuda.is_available():
+                #print("Initializing Cuda Nets...")
+                norm_operator.cuda()
+            attn_map = norm_operator(torch.squeeze(conv_map))
+
+
+            conv_map_traj.append(attn_map)
             conv_map_stacked = torch.stack(conv_map_traj)
 
         return sum_rewards, sum_abs_rewards, conv_map_stacked

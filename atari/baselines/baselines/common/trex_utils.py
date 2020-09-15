@@ -20,7 +20,11 @@ def mask_score(obs, env_name):
         n_bottom = 14
         obs_copy[:,:n_top,:,:] = 0
         obs_copy[:,-n_bottom:,:,:] = 0
-        #cuts out place in race, but keeps odometer
+    elif env_name == "centipede":
+        n_top = 0
+        n_bottom = 10
+        obs_copy[:,:n_top,:,:] = 0
+        obs_copy[:,-n_bottom:,:,:] = 0
     elif env_name == "hero":
         n_top = 0
         n_bottom = 30
@@ -43,15 +47,21 @@ def mask_score(obs, env_name):
     elif env_name == "videopinball":
         n_top = 15
         obs_copy[:,:n_top,:,:] = 0
-    elif env_name == "montezumarevenge":
+    elif env_name == "montezumarevenge" or env_name=="phoenix":
         n_top = 10
         obs_copy[:,:n_top,:,:] = 0
+    elif env_name == "asterix":
+        n_top = 10
+        n_bottom = 10
+        obs_copy[:,:n_top,:,:] = 0
+        obs_copy[:,-n_bottom:,:,:] = 0
     else:
         print("NOT MASKING SCORE FOR GAME: " + env_name)
         pass
         #n = 20
         #obs_copy[:,-n:,:,:] = 0
     return obs_copy
+
 
 def preprocess(ob, env_name):
     #print("masking on env", env_name)

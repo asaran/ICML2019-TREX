@@ -23,7 +23,7 @@ i=0
 for env in env_names:
   for seed in seeds:
     #gpu_id = gpu[i%len(gpu)]
-    screen_name = 'PPO_'+env[0]+'_seed'+seed
+    screen_name = 'PPO_'+env[0]+'_seed'+seed+"_two-data"
 
     bash_file_name = 'gaze_pred/'+screen_name+'.sh'
     f = open(bash_file_name,'w')
@@ -34,7 +34,7 @@ for env in env_names:
     f.write("#SBATCH --error=logs/slurmjob_%j.err\n")
     f.write("#SBATCH --mail-user=asaran@cs.utexas.edu\n")
     f.write("#SBATCH --mail-type=END,FAIL,REQUEUE\n")
-    f.write("#SBATCH --partition dgx\n")
+    f.write("#SBATCH --partition titans\n")
     f.write("#SBATCH --nodes=1\n")
     f.write("#SBATCH --ntasks-per-node=1\n")
     f.write("#SBATCH --time 84:00:00\n") 
@@ -42,7 +42,7 @@ for env in env_names:
     f.write("#SBATCH --mem=50G\n")
     f.write("#SBATCH --cpus-per-task=8\n")
              
-    f.write("OPENAI_LOG_FORMAT='stdout,log,csv,tensorboard' OPENAI_LOGDIR=ppo_models/base/"+env[0]+'_seed'+seed+" python -m baselines.run --alg=ppo2 --env="+env[1]+"NoFrameskip-v4 --custom_reward pytorch --custom_reward_path reward_models_AAAI2020/"+env[0]+'_seed_'+seed+" --seed "+seed+" --num_timesteps=5e7 --save_interval=500 --num_env 9\n")
+    f.write("OPENAI_LOG_FORMAT='stdout,log,csv,tensorboard' OPENAI_LOGDIR=ppo_models/base_two/"+env[0]+'_seed'+seed+" python -m baselines.run --alg=ppo2 --env="+env[1]+"NoFrameskip-v4 --custom_reward pytorch --custom_reward_path reward_models_AAAI2020/"+env[0]+'_seed_'+seed+"two-data"+" --seed "+seed+" --num_timesteps=5e7 --save_interval=500 --num_env 9\n")
     
     i+=1
       
