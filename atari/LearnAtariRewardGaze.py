@@ -132,6 +132,7 @@ def get_gaze_KL_loss(true_gaze, conv_gaze): # order of 60s
     import torch.nn.functional as F
     loss = 0
     batch_size = true_gaze.shape[0]
+    print(true_gaze.shape)
 
     # assert batch size for both conv and true gaze is the same
     assert(batch_size==conv_gaze.shape[0])

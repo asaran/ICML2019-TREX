@@ -7,10 +7,9 @@
 #SBATCH --mail-type=END,FAIL,REQUEUE
 ###SBATCH --partition Test
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=4
+#SBATCH --ntasks-per-node=1
 #SBATCH --time 72:00:00
-#SBATCH --gres=gpu:4
-#SBATCH --mem=100G
+#SBATCH --gres=gpu:1
+#SBATCH --mem=50G
 #SBATCH --cpus-per-task=8
-OPENAI_LOG_FORMAT='stdout,log,csv,tensorboard' OPENAI_LOGDIR=path_to_logs/experts/spaceinvaders_expert_conv1_KL_0 python -m baselines.run --alg=ppo2 --env=SpaceInvadersNoFrameskip-v4 --custom_reward pytorch --custom_reward_path learned_models/experts/spaceinvaders_expert_conv1_KL_0.1 --seed 0 --num_timesteps=5e7 --save_interval=500 --num_env 9
-"
+OPENAI_LOG_FORMAT='stdout,log,csv,tensorboard' OPENAI_LOGDIR=path_to_logs/experts/spaceinvaders_expert_conv1_KL_0.1_0 python -m baselines.run --alg=ppo2 --env=SpaceInvadersNoFrameskip-v4 --custom_reward pytorch --custom_reward_path learned_models/experts/spaceinvaders_expert_conv1_KL_0.1 --seed 0 --num_timesteps=5e7 --save_interval=500 --num_env 9

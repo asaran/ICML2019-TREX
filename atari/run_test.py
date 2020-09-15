@@ -122,6 +122,7 @@ if __name__ == '__main__':
     parser.add_argument('--episode_count', default=100)
     parser.add_argument('--record_video', action='store_true')
     parser.add_argument('--render', action='store_true')
+    parser.add_argument('--save_dir', default='./videos/', help='path where recorded videos be saved')
     
     args = parser.parse_args()
 
@@ -140,7 +141,7 @@ if __name__ == '__main__':
                            'episode_life':False,
                        })
     if args.record_video:
-        env = VecVideoRecorder(env,'./videos/',lambda steps: True, 200000) # Always record every episode
+        env = VecVideoRecorder(env,args.save_dir,lambda steps: True, 200000) # Always record every episode
 
     if args.env_type == 'atari':
         env = VecFrameStack(env, 4)
