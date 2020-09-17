@@ -1,6 +1,5 @@
-#env_names = [['asterix','Asterix'],['centipede','Centipede'],['phoenix','Phoenix'],['breakout','Breakout'], ['hero','Hero'],['seaquest','Seaquest'],['spaceinvaders','SpaceInvaders'],['mspacman','MsPacman']]
-#env_names = [['breakout','Breakout'], ['hero','Hero'],['seaquest','Seaquest'],['spaceinvaders','SpaceInvaders'],['enduro','Enduro'],['beamrider','BeamRider'],['qbert','Qbert'],['pong','Pong']]
-env_names = [['asterix','Asterix'],['phoenix','Phoenix'],['centipede','Centipede'],['seaquest','Seaquest'],['mspacman','MsPacman'],['breakout','Breakout']]
+env_names = [['alien','Alien'],['asterix','Asterix'],['bank_heist','BankHeist'],['berzerk','Berzerk'],['breakout','Breakout'],['centipede','Centipede'],['demon_attack','DemonAttack'],['enduro','Enduro'],['freeway','Freeway'],['frostbite','Frostbite'],['hero','Hero'],['montezuma_revenge','MontezumaRevenge'],['mspacman','MsPacman'],['name_this_game','NameThisGame'],['phoneix','Phoenix'],['riverraid','Riverraid'],['road_runner','RoadRunner'],['seaquest','Seaquest'],['space_invaders','SpaceInvaders'],['venture','Venture']]
+#env_names = [['asterix','Asterix'],['phoenix','Phoenix'],['centipede','Centipede'],['seaquest','Seaquest'],['mspacman','MsPacman'],['breakout','Breakout']]
 seeds = ['0']#,'1','2']
 #conv_layer = '' #'1'
 #user_type = 'expert'
@@ -34,7 +33,7 @@ for env in env_names:
     f.write("#SBATCH --error=logs/slurmjob_%j.err\n")
     f.write("#SBATCH --mail-user=asaran@cs.utexas.edu\n")
     f.write("#SBATCH --mail-type=END,FAIL,REQUEUE\n")
-    f.write("#SBATCH --partition titans\n")
+    f.write("#SBATCH --partition dgx\n")
     f.write("#SBATCH --nodes=1\n")
     f.write("#SBATCH --ntasks-per-node=1\n")
     f.write("#SBATCH --time 84:00:00\n") 

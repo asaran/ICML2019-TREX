@@ -1,4 +1,5 @@
-env_names = ['asterix','breakout','centipede','phoenix','seaquest','mspacman']
+#env_names = ['asterix','breakout','centipede','phoenix','seaquest','mspacman']
+env_names = ['alien','asterix','bank_heist','berzerk','breakout','centipede','demon_attack','enduro','freeway','frostbite','hero','montezuma_revenge','mspacman','name_this_game','phoneix','riverraid','road_runner','seaquest','space_invaders','venture']
 seeds = ['0']
 weights = ['0.001','0.005','0.01','0.05','0.1','0.3','0.5','0.7','0.9']
 
@@ -21,7 +22,7 @@ for game in env_names:
             f.write("#SBATCH --error=logs/human_%j.err\n")
             f.write("#SBATCH --mail-user=asaran@cs.utexas.edu\n")
             f.write("#SBATCH --mail-type=END,FAIL,REQUEUE\n")
-            f.write("###SBATCH --partition Test\n")
+            f.write("#SBATCH --partition dgx\n")
             f.write("#SBATCH --nodes=1\n")
             f.write("#SBATCH --ntasks-per-node=1\n")
             f.write("#SBATCH --time 72:00:00\n")

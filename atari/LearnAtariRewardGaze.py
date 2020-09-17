@@ -44,9 +44,9 @@ def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_le
     
     if use_gaze and not use_human_gaze:
         # get gaze prediction
-        model_path = './gaze/pretrained_models/expert/' \
+        model_path = './gaze/pretrained_models/gaze_models/CGL-agil-small-2demo/' \
             + env_name + '.hdf5'
-        meanfile_path = './gaze/pretrained_models/means/' + env_name + '.mean.npy'
+        meanfile_path = './gaze/pretrained_models/gaze_models/CGL-agil-small-2demo/' + env_name + '.mean.npy'
         h = gh.PretrainedHeatmap(env_name, model_path, meanfile_path)
         heatmap_shape = 84
 
@@ -213,11 +213,11 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
                     # gaze_loss_i = get_gaze_KL_loss(gaze_i, torch.squeeze(conv_map_i))
                     # gaze_loss_j = get_gaze_KL_loss(gaze_j, torch.squeeze(conv_map_j))
 
-                    print('shapes of conv maps...')
-                    print(conv_map_i.shape)
+                    #print('shapes of conv maps...')
+                    #print(conv_map_i.shape)
                     attn_map_i = torch.unsqueeze(torch.squeeze(conv_map_i),1)
                     attn_map_j = torch.unsqueeze(torch.squeeze(conv_map_j),1)
-                    print(attn_map_i.shape)
+                    #print(attn_map_i.shape)
                     # attn_shape = torch.Size([attn_map.shape[0], attn_map.shape[1], 84,84])
                     attn_map_i = F.interpolate(attn_map_i, (84,84), mode="bilinear", align_corners=False)
                     attn_map_j = F.interpolate(attn_map_j, (84,84), mode="bilinear", align_corners=False)
@@ -300,16 +300,22 @@ if __name__=="__main__":
 
     args = parser.parse_args()
     env_name = args.env_name
-    if env_name == "spaceinvaders":
-        env_id = "SpaceInvadersNoFrameskip-v4"
-    elif env_name == "mspacman":
+    #if env_name == "spaceinvaders":
+    #    env_id = "SpaceInvadersNoFrameskip-v4"
+    if env_name == "mspacman":
         env_id = "MsPacmanNoFrameskip-v4"
     elif env_name == "videopinball":
         env_id = "VideoPinballNoFrameskip-v4"
     elif env_name == "beamrider":
         env_id = "BeamRiderNoFrameskip-v4"
     else:
-        env_id = env_name[0].upper() + env_name[1:] + "NoFrameskip-v4"
+    #    env_id = env_name[0].upper() + env_name[1:] + "NoFrameskip-v4"
+        env_name_parts = env_name.split('_')
+        # print(env_name_parts)
+        env_id = ''
+        for env_part in env_name_parts:
+            env_id += env_part[0].upper() + env_part[1:] 
+        env_id += "NoFrameskip-v4"
 
     env_type = "atari"
     #set seeds
