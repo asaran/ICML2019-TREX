@@ -27,3 +27,4 @@ eval_beforeIJCAI/*
 path_to_logs_beforeIJCAI/*
 ppo_ckpts/*
 slurm_scripts/tmp/*
+reward_models/*

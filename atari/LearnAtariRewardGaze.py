@@ -198,6 +198,7 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
             output_loss = loss_criterion(outputs, labels)
 
             loss = output_loss + l1_reg * abs_rewards
+            # TODO: plot validation losses instead of training losses
             writer.add_scalar('CE_loss', loss.item(), epoch*len(training_labels)+i)
 
             if gaze_loss_type in ['KL', 'IG']:
@@ -228,6 +229,7 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
                     gaze_loss_j = torch.sum(kl_j)
 
                     gaze_loss_total = (gaze_loss_i + gaze_loss_j)
+                    # TODO: use weighted loss for plotting (gaze_reg*gaze_loss_total)
                     writer.add_scalar('KL_loss', gaze_loss_total.item(), epoch*len(training_labels)+i) 
 
                 loss = (1-gaze_reg)*loss + gaze_reg * gaze_loss_total
