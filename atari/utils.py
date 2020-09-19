@@ -297,4 +297,6 @@ def get_preprocessed_trajectories(env_name, dataset, data_dir, use_gaze=False):
     #     print(len(human_demos[0]), len(human_rewards[0]), len(human_gaze[0]))
     #     print(len(human_demos), len(human_rewards), len(human_gaze))
 
+
     return human_demos, human_scores, human_rewards
+

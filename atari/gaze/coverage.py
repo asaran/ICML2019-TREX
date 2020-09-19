@@ -29,7 +29,11 @@ def preprocess2_batch(smap):
 def computeKL_batch(saliency_map, gt_saliency_map):
     epsilon = 2.2204e-16 #MIT benchmark
     N = saliency_map.shape[0]
-    # print(saliency_map.shape, gt_saliency_map.shape)
+    #print(saliency_map.shape, gt_saliency_map.shape)
+    #print(saliency_map.type(), gt_saliency_map.type()) #torch.cuda.FloatTensor, torch.cuda.DoubleTensor
+    
+    saliency_map = torch.squeeze(saliency_map).float()
+    gt_saliency_map = torch.squeeze(gt_saliency_map).float()
     assert(saliency_map.shape==gt_saliency_map.shape)
     
     saliency_map = preprocess_batch(saliency_map)
@@ -47,6 +51,9 @@ def computeIG_batch(saliency_map, gt_saliency_map):
     epsilon = 2.2204e-16 #MIT benchmark
     N = saliency_map.shape[0]
     assert(saliency_map.shape==gt_saliency_map.shape)
+
+    saliency_map = torch.squeeze(saliency_map).float()
+    gt_saliency_map = torch.squeeze(gt_saliency_map).float()
     
     saliency_map = preprocess_batch(saliency_map)
     saliency_map = torch.clamp(saliency_map, epsilon, None)

@@ -5,27 +5,32 @@ def normalize_state(obs):
 #custom masking function for covering up the score/life portions of atari games
 def mask_score(obs, env_name):
     obs_copy = obs.copy()
-    if env_name == "spaceinvaders" or env_name == "breakout" or env_name == "pong":
+    if env_name in ["space_invaders","breakout","pong","spaceinvaders"]:
         #takes a stack of four observations and blacks out (sets to zero) top n rows
         n = 10
         #no_score_obs = copy.deepcopy(obs)
         obs_copy[:,:n,:,:] = 0
-    elif env_name == "beamrider":
+    elif env_name in ["beamrider"]:
         n_top = 16
         n_bottom = 11
         obs_copy[:,:n_top,:,:] = 0
         obs_copy[:,-n_bottom:,:,:] = 0
-    elif env_name == "enduro":
+    elif env_name in ["enduro","alien"]:
         n_top = 0
         n_bottom = 14
         obs_copy[:,:n_top,:,:] = 0
         obs_copy[:,-n_bottom:,:,:] = 0
-    elif env_name == "centipede":
+    elif env_name in ["bank_heist"]:
+        n_top = 0
+        n_bottom = 13
+        obs_copy[:,:n_top,:,:] = 0
+        obs_copy[:,-n_bottom:,:,:] = 0
+    elif env_name in ["centipede"]:
         n_top = 0
         n_bottom = 10
         obs_copy[:,:n_top,:,:] = 0
         obs_copy[:,-n_bottom:,:,:] = 0
-    elif env_name == "hero":
+    elif env_name in ["hero"]:
         n_top = 0
         n_bottom = 30
         obs_copy[:,:n_top,:,:] = 0
@@ -35,23 +40,34 @@ def mask_score(obs, env_name):
         #n_bottom = 0
         obs_copy[:,:n_top,:,:] = 0
         #obs_copy[:,-n_bottom:,:,:] = 0
-    elif env_name == "seaquest":
+    elif env_name in ["seaquest"]:
         n_top = 12
         n_bottom = 16
         obs_copy[:,:n_top,:,:] = 0
         obs_copy[:,-n_bottom:,:,:] = 0
         #cuts out divers and oxygen
-    elif env_name == "mspacman":
+    elif env_name in ["mspacman","name_this_game"]:
         n_bottom = 15 #mask score and number lives left
         obs_copy[:,-n_bottom:,:,:] = 0
-    elif env_name == "videopinball":
+    elif env_name in ["berzerk"]:
+        n_bottom = 11 #mask score and number lives left
+        obs_copy[:,-n_bottom:,:,:] = 0
+    elif env_name in ["riverraid"]:
+        n_bottom = 18 #mask score and number lives left
+        obs_copy[:,-n_bottom:,:,:] = 0
+    elif env_name in ["videopinball"]:
         n_top = 15
         obs_copy[:,:n_top,:,:] = 0
-    elif env_name == "montezumarevenge" or env_name=="phoenix":
+    elif env_name in ["montezuma_revenge", "phoenix", "venture","road_runner"]:
         n_top = 10
         obs_copy[:,:n_top,:,:] = 0
-    elif env_name == "asterix":
+    elif env_name in ["asterix","demon_attack","freeway"]:
         n_top = 10
+        n_bottom = 10
+        obs_copy[:,:n_top,:,:] = 0
+        obs_copy[:,-n_bottom:,:,:] = 0
+    elif env_name in ["frostbite"]:
+        n_top = 12
         n_bottom = 10
         obs_copy[:,:n_top,:,:] = 0
         obs_copy[:,-n_bottom:,:,:] = 0
@@ -61,7 +77,6 @@ def mask_score(obs, env_name):
         #n = 20
         #obs_copy[:,-n:,:,:] = 0
     return obs_copy
-
 
 def preprocess(ob, env_name):
     #print("masking on env", env_name)

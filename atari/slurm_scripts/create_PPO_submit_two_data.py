@@ -1,6 +1,5 @@
-#env_names = [['asterix','Asterix'],['centipede','Centipede'],['phoenix','Phoenix'],['breakout','Breakout'], ['hero','Hero'],['seaquest','Seaquest'],['spaceinvaders','SpaceInvaders'],['mspacman','MsPacman']]
-#env_names = [['breakout','Breakout'], ['hero','Hero'],['seaquest','Seaquest'],['spaceinvaders','SpaceInvaders'],['enduro','Enduro'],['beamrider','BeamRider'],['qbert','Qbert'],['pong','Pong']]
-env_names = [['asterix','Asterix'],['phoenix','Phoenix'],['centipede','Centipede'],['seaquest','Seaquest'],['mspacman','MsPacman'],['breakout','Breakout']]
+env_names = [['alien','Alien'],['asterix','Asterix'],['bank_heist','BankHeist'],['berzerk','Berzerk'],['breakout','Breakout'],['centipede','Centipede'],['demon_attack','DemonAttack'],['enduro','Enduro'],['freeway','Freeway'],['frostbite','Frostbite'],['hero','Hero'],['montezuma_revenge','MontezumaRevenge'],['mspacman','MsPacman'],['name_this_game','NameThisGame'],['phoneix','Phoenix'],['riverraid','Riverraid'],['road_runner','RoadRunner'],['seaquest','Seaquest'],['space_invaders','SpaceInvaders'],['venture','Venture']]
+#env_names = [['asterix','Asterix'],['phoenix','Phoenix'],['centipede','Centipede'],['seaquest','Seaquest'],['mspacman','MsPacman'],['breakout','Breakout']]
 seeds = ['0']#,'1','2']
 #conv_layer = '' #'1'
 #user_type = 'expert'
@@ -23,7 +22,7 @@ i=0
 for env in env_names:
   for seed in seeds:
     #gpu_id = gpu[i%len(gpu)]
-    screen_name = 'PPO_'+env[0]+'_seed'+seed
+    screen_name = 'PPO_'+env[0]+'_seed'+seed+"_two-data"
 
     bash_file_name = 'gaze_pred/'+screen_name+'.sh'
     f = open(bash_file_name,'w')
@@ -42,7 +41,7 @@ for env in env_names:
     f.write("#SBATCH --mem=50G\n")
     f.write("#SBATCH --cpus-per-task=8\n")
              
-    f.write("OPENAI_LOG_FORMAT='stdout,log,csv,tensorboard' OPENAI_LOGDIR=ppo_models/base/"+env[0]+'_seed'+seed+" python -m baselines.run --alg=ppo2 --env="+env[1]+"NoFrameskip-v4 --custom_reward pytorch --custom_reward_path reward_models_AAAI2020/"+env[0]+'_seed_'+seed+" --seed "+seed+" --num_timesteps=5e7 --save_interval=500 --num_env 9\n")
+    f.write("OPENAI_LOG_FORMAT='stdout,log,csv,tensorboard' OPENAI_LOGDIR=ppo_models/base_two/"+env[0]+'_seed'+seed+" python -m baselines.run --alg=ppo2 --env="+env[1]+"NoFrameskip-v4 --custom_reward pytorch --custom_reward_path reward_models_AAAI2020/"+env[0]+'_seed_'+seed+"two-data"+" --seed "+seed+" --num_timesteps=5e7 --save_interval=500 --num_env 9\n")
     
     i+=1
       
