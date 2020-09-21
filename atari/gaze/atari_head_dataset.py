@@ -33,6 +33,7 @@ class AtariHeadDataset():
                                 for traj in self.trajectories[g]])
             final_scores = [self.trajectories[g][traj][-1]['score']
                             for traj in self.trajectories[g]]
+            print([traj for traj in self.trajectories[g]])
             print('final scores: ',final_scores)
 
             self.stats[g]['total_replays'] = len(nb_games)
@@ -145,5 +146,8 @@ class AtariHeadDataset():
                                 last_episode = curr_trans['episode']
                                 final_trial_episode[curr_trial] = last_episode
                                 last_traj[curr_trial] = curr_traj
-                trajectories[game][int(traj.split('_')[0])] = curr_traj
+                print('checking curr_traj before appending: ',len(curr_traj),int(traj.split('_')[0]))
+                # Do not add any trajectories less than length 50 (min snippet length being used by default TREX)
+                if len(curr_traj)>=50:
+                    trajectories[game][int(traj.split('_')[0])] = curr_traj
         return trajectories
