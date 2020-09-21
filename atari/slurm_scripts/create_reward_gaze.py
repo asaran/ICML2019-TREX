@@ -25,7 +25,7 @@ for game in env_names:
             f.write("#SBATCH --nodes=1\n")
             f.write("#SBATCH --ntasks-per-node=1\n")
             f.write("#SBATCH --time 72:00:00\n")
-            f.write("#SBATCH --gres=gpu:4\n")
+            f.write("#SBATCH --gres=gpu:1\n")
             f.write("#SBATCH --mem=70G\n")
             f.write("#SBATCH --cpus-per-task=8\n")
 

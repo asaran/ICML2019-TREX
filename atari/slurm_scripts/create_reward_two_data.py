@@ -23,11 +23,11 @@ for game in env_names:
             f.write("#SBATCH --error=logs/human_%j.err\n")
             f.write("#SBATCH --mail-user=asaran@cs.utexas.edu\n")
             f.write("#SBATCH --mail-type=END,FAIL,REQUEUE\n")
-            f.write("###SBATCH --partition Test\n")
+            f.write("#SBATCH --partition titans\n")
             f.write("#SBATCH --nodes=1\n")
             f.write("#SBATCH --ntasks-per-node=1\n")
             f.write("#SBATCH --time 72:00:00\n")
-            f.write("#SBATCH --gres=gpu:4\n")
+            f.write("#SBATCH --gres=gpu:1\n")
             f.write("#SBATCH --mem=70G\n")
             f.write("#SBATCH --cpus-per-task=8\n")
 
