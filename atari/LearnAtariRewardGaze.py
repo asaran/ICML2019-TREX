@@ -97,6 +97,8 @@ def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_le
 
         #create random snippets
         #find min length of both demos to ensure we can pick a demo no earlier than that chosen in worse preferred demo
+        #print(len(demonstrations[ti]),len(demonstrations[tj]))
+        #print(min_snippet_length, max_snippet_length)
         min_length = min(len(demonstrations[ti]), len(demonstrations[tj]))
         rand_length = np.random.randint(min_snippet_length, max_snippet_length)
         if ti < tj: #pick tj snippet to be later than ti
