@@ -19,9 +19,9 @@ parser = argparse.ArgumentParser(description=None)
 parser.add_argument('--env_name', default='', help='Select the environment name to run, i.e. pong')
 parser.add_argument('--reward_net_path', default='', help="name and location for learned model params")
 parser.add_argument('--seed', default=0, help="random seed for experiments")
-parser.add_argument('--models_dir', default = ".", help="top directory where checkpoint models for demos are stored")
+# parser.add_argument('--models_dir', default = ".", help="top directory where checkpoint models for demos are stored")
 parser.add_argument('--save_fig_dir', help ="where to save visualizations")
-parser.add_argument('--data_dir', default='../../learning-rewards-of-learners/data/atari-head/', help='path to data directory with demonstrations')
+parser.add_argument('--data_dir', default='../../atari-head/', help='path to data directory with demonstrations')
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # Assume that we are on a CUDA machine, then this should print a CUDA device:
@@ -111,9 +111,15 @@ class Net(nn.Module):
         return torch.cat([cum_r_i, cum_r_j]), abs_r_i + abs_r_j
 '''
 
-reward = Net(gaze_dropout=False, gaze_loss_type=None)
-reward.load_state_dict(torch.load(reward_net_path))
+if torch.cuda.is_available():
+    map_location=lambda storage, loc: storage.cuda()
+else:
+    map_location='cpu'
+print(map_location, device)
+reward = Net(gaze_loss_type=None)
 reward.to(device)
+reward.load_state_dict(torch.load(reward_net_path),map_location=map_location)
+
 
 
 
