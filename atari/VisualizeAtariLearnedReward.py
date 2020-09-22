@@ -118,7 +118,7 @@ else:
 print(map_location, device)
 reward = Net(gaze_loss_type=None)
 reward.to(device)
-reward.load_state_dict(torch.load(reward_net_path),map_location=map_location)
+reward.load_state_dict(torch.load(reward_net_path,map_location=map_location))
 
 
 
@@ -270,12 +270,12 @@ for checkpoint in checkpoints_extrapolate:
 env.close()
 
 '''
-import utils
-import atari_head_dataset as ahd
+from gaze import human_utils
+from gaze import atari_head_dataset as ahd
 # get real human demos
 
 dataset = ahd.AtariHeadDataset(args.env_name, args.data_dir)
-demonstrations, learning_returns, learning_rewards, learning_gaze = utils.get_preprocessed_trajectories(env_name, dataset, args.data_dir, use_gaze=False, gaze_conv_layer=0, use_motion=False)
+demonstrations, learning_returns, learning_rewards = human_utils.get_preprocessed_trajectories(env_name, dataset, args.data_dir)
 
 
 
@@ -328,7 +328,10 @@ with torch.no_grad():
     for d in demonstrations:
         print(cnt)
         cnt += 1
+        print('len demo:',len(d))
         for i,s in enumerate(d[2:-1]):
+            print(type(s), len(s))
+            print(reward.cum_return(torch.from_numpy(np.array([s]))))
             r = reward.cum_return(torch.from_numpy(np.array([s])).float().to(device))[0].item()
             if r < min_reward:
                 min_reward = r

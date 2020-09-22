@@ -6,7 +6,7 @@ env_names = [['alien','Alien'],['asterix','Asterix'],['bank_heist','BankHeist'],
 seeds = ['0']#,'1','2']
 #conv_layer = '' #'1'
 #user_type = 'expert'
-gaze_loss_type = 'KL'
+gaze_loss_type = 'KL_two'
 #gaze_reg = '0.01'
 weights = ['0.001','0.005','0.01','0.05','0.1','0.3','0.5','0.7','0.9']
 
