@@ -21,7 +21,7 @@ for env in env_names:
             f.write("#SBATCH --error=logs/slurmjob_%j.err\n")
             f.write("#SBATCH --mail-user=asaran@cs.utexas.edu\n")
             f.write("#SBATCH --mail-type=END,FAIL,REQUEUE\n")
-            f.write("###SBATCH --partition titan\n")
+            f.write("#SBATCH --partition titans\n")
             f.write("#SBATCH --nodes=1\n")
             f.write("#SBATCH --ntasks-per-node=1\n")
             f.write("#SBATCH --time 72:00:00\n") 

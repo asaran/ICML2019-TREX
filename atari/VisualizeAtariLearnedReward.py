@@ -328,13 +328,15 @@ with torch.no_grad():
     for d in demonstrations:
         print(cnt)
         cnt += 1
-        print('len(d):',len(d))
+
+        # print('len(d):',len(d))
         for i,s in enumerate(d[2:-1]):
             # print('len(s):',len(s))
             # print('len(s[0]):', len(s[0]))
             # print(s[0])
             # print(s[0].shape, type(s[0]))
             r = reward.cum_return(torch.from_numpy(s[0]).float())[0].float().to(device).item()
+
             if r < min_reward:
                 min_reward = r
                 min_frame = s[0]

@@ -20,7 +20,7 @@ if __name__ == '__main__':
     if args.all_games:
         env_names = ['alien','asterix','bank_heist','berzerk','breakout','centipede','demon_attack','enduro','freeway','frostbite','hero','montezuma_revenge','mspacman','name_this_game','phoenix','riverraid','road_runner','seaquest','space_invaders','venture']
     else:
-        env_names = ['asterix','breakout','centipede','phoenix','seaquest','mspacman']
+        env_names = ['asterix','breakout','centipede','phoenix','mspacman','seaquest']
 
     avgs, stds = [], []
 
