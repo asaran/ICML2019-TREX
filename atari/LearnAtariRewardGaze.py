@@ -29,7 +29,7 @@ from baselines.common.trex_utils import preprocess, mask_score
 from gaze.coverage import *
 
 
-def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, use_gaze, use_human_gaze=False):
+def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, use_gaze, two_data, use_human_gaze=False):
     #collect training data
     max_traj_length = 0
     training_obs = []
@@ -43,10 +43,16 @@ def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_le
         demos, learning_returns, _ = human_utils.get_preprocessed_trajectories(env_name, dataset, data_dir)
     
     if use_gaze and not use_human_gaze:
-        # get gaze prediction
-        model_path = './gaze/pretrained_models/gaze_models/CGL-agil-small-2demo/' \
-            + env_name + '.hdf5'
-        meanfile_path = './gaze/pretrained_models/gaze_models/CGL-agil-small-2demo/' + env_name + '.mean.npy'
+        if two_data:
+            # get gaze prediction
+            model_path = './gaze/pretrained_models/gaze_models/CGL-agil-small-2demo/' \
+                + env_name + '.hdf5'
+            meanfile_path = './gaze/pretrained_models/gaze_models/CGL-agil-small-2demo/' + env_name + '.mean.npy'
+        else:
+            model_path = './gaze/pretrained_models/expert/' \
+                + env_name + '.hdf5'
+            meanfile_path = './gaze/pretrained_models/means/' + env_name + '.mean.npy'
+
         h = gh.PretrainedHeatmap(env_name, model_path, meanfile_path)
         heatmap_shape = 84
 
@@ -300,7 +306,7 @@ if __name__=="__main__":
     parser.add_argument('--gaze_loss', default=None, type=str, help="type of gaze loss function: sinkhorn, exact, coverage, KL, None")
     parser.add_argument('--gaze_reg', default=0.01, type=float, help="gaze loss multiplier")
     parser.add_argument('--gaze_conv_layer', default=4, type=int, help='the convlayer of the reward network to which gaze should be compared')
-
+    parser.add_argument('--two_demos', default=False, action='store_true', help="use two demos versus full dataset")
 
     args = parser.parse_args()
     env_name = args.env_name
@@ -380,7 +386,7 @@ if __name__=="__main__":
     sorted_returns = sorted(learning_returns)
     
     print('collecting traj snippets...')
-    training_data = create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, use_gaze)
+    training_data = create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, use_gaze, args.two_demos)
     training_obs, training_labels, training_gaze = training_data
 
     print("num training_obs", len(training_obs))
