@@ -24,8 +24,10 @@ class Net(nn.Module):
         '''calculate cumulative return of trajectory'''
         sum_rewards = 0
         sum_abs_rewards = 0
+        # print(traj.shape)
         x = traj.permute(0, 3, 1, 2)  # get into NCHW format
         # compute forward pass of reward network (we parallelize across frames so batch size is length of partial trajectory)
+        # x = x.float()
         x1 = F.leaky_relu(self.conv1(x))
         x2 = F.leaky_relu(self.conv2(x1))
         x3 = F.leaky_relu(self.conv3(x2))

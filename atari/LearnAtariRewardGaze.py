@@ -29,7 +29,7 @@ from baselines.common.trex_utils import preprocess, mask_score
 from gaze.coverage import *
 
 
-def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, use_gaze, use_human_gaze=False):
+def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, use_gaze, two_data, use_human_gaze=False):
     #collect training data
     max_traj_length = 0
     training_obs = []
@@ -43,10 +43,16 @@ def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_le
         demos, learning_returns, _ = human_utils.get_preprocessed_trajectories(env_name, dataset, data_dir)
     
     if use_gaze and not use_human_gaze:
-        # get gaze prediction
-        model_path = './gaze/pretrained_models/expert/' \
-            + env_name + '.hdf5'
-        meanfile_path = './gaze/pretrained_models/means/' + env_name + '.mean.npy'
+        if two_data:
+            # get gaze prediction
+            model_path = './gaze/pretrained_models/gaze_models/CGL-agil-small-2demo/' \
+                + env_name + '.hdf5'
+            meanfile_path = './gaze/pretrained_models/gaze_models/CGL-agil-small-2demo/' + env_name + '.mean.npy'
+        else:
+            model_path = './gaze/pretrained_models/expert/' \
+                + env_name + '.hdf5'
+            meanfile_path = './gaze/pretrained_models/means/' + env_name + '.mean.npy'
+
         h = gh.PretrainedHeatmap(env_name, model_path, meanfile_path)
         heatmap_shape = 84
 
@@ -97,6 +103,8 @@ def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_le
 
         #create random snippets
         #find min length of both demos to ensure we can pick a demo no earlier than that chosen in worse preferred demo
+        #print(len(demonstrations[ti]),len(demonstrations[tj]))
+        #print(min_snippet_length, max_snippet_length)
         min_length = min(len(demonstrations[ti]), len(demonstrations[tj]))
         rand_length = np.random.randint(min_snippet_length, max_snippet_length)
         if ti < tj: #pick tj snippet to be later than ti
@@ -198,6 +206,7 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
             output_loss = loss_criterion(outputs, labels)
 
             loss = output_loss + l1_reg * abs_rewards
+            # TODO: plot validation losses instead of training losses
             writer.add_scalar('CE_loss', loss.item(), epoch*len(training_labels)+i)
 
             if gaze_loss_type in ['KL', 'IG']:
@@ -213,11 +222,11 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
                     # gaze_loss_i = get_gaze_KL_loss(gaze_i, torch.squeeze(conv_map_i))
                     # gaze_loss_j = get_gaze_KL_loss(gaze_j, torch.squeeze(conv_map_j))
 
-                    print('shapes of conv maps...')
-                    print(conv_map_i.shape)
+                    #print('shapes of conv maps...')
+                    #print(conv_map_i.shape)
                     attn_map_i = torch.unsqueeze(torch.squeeze(conv_map_i),1)
                     attn_map_j = torch.unsqueeze(torch.squeeze(conv_map_j),1)
-                    print(attn_map_i.shape)
+                    #print(attn_map_i.shape)
                     # attn_shape = torch.Size([attn_map.shape[0], attn_map.shape[1], 84,84])
                     attn_map_i = F.interpolate(attn_map_i, (84,84), mode="bilinear", align_corners=False)
                     attn_map_j = F.interpolate(attn_map_j, (84,84), mode="bilinear", align_corners=False)
@@ -228,6 +237,7 @@ def learn_reward(reward_network, optimizer, training_data, num_iter, l1_reg, che
                     gaze_loss_j = torch.sum(kl_j)
 
                     gaze_loss_total = (gaze_loss_i + gaze_loss_j)
+                    # TODO: use weighted loss for plotting (gaze_reg*gaze_loss_total)
                     writer.add_scalar('KL_loss', gaze_loss_total.item(), epoch*len(training_labels)+i) 
 
                 loss = (1-gaze_reg)*loss + gaze_reg * gaze_loss_total
@@ -296,20 +306,26 @@ if __name__=="__main__":
     parser.add_argument('--gaze_loss', default=None, type=str, help="type of gaze loss function: sinkhorn, exact, coverage, KL, None")
     parser.add_argument('--gaze_reg', default=0.01, type=float, help="gaze loss multiplier")
     parser.add_argument('--gaze_conv_layer', default=4, type=int, help='the convlayer of the reward network to which gaze should be compared')
-
+    parser.add_argument('--two_demos', default=False, action='store_true', help="use two demos versus full dataset")
 
     args = parser.parse_args()
     env_name = args.env_name
-    if env_name == "spaceinvaders":
-        env_id = "SpaceInvadersNoFrameskip-v4"
-    elif env_name == "mspacman":
+    #if env_name == "spaceinvaders":
+    #    env_id = "SpaceInvadersNoFrameskip-v4"
+    if env_name == "mspacman":
         env_id = "MsPacmanNoFrameskip-v4"
     elif env_name == "videopinball":
         env_id = "VideoPinballNoFrameskip-v4"
     elif env_name == "beamrider":
         env_id = "BeamRiderNoFrameskip-v4"
     else:
-        env_id = env_name[0].upper() + env_name[1:] + "NoFrameskip-v4"
+    #    env_id = env_name[0].upper() + env_name[1:] + "NoFrameskip-v4"
+        env_name_parts = env_name.split('_')
+        # print(env_name_parts)
+        env_id = ''
+        for env_part in env_name_parts:
+            env_id += env_part[0].upper() + env_part[1:] 
+        env_id += "NoFrameskip-v4"
 
     env_type = "atari"
     #set seeds
@@ -370,7 +386,7 @@ if __name__=="__main__":
     sorted_returns = sorted(learning_returns)
     
     print('collecting traj snippets...')
-    training_data = create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, use_gaze)
+    training_data = create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_length, max_snippet_length, use_gaze, args.two_demos)
     training_obs, training_labels, training_gaze = training_data
 
     print("num training_obs", len(training_obs))

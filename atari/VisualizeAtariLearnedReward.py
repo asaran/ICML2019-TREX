@@ -19,9 +19,9 @@ parser = argparse.ArgumentParser(description=None)
 parser.add_argument('--env_name', default='', help='Select the environment name to run, i.e. pong')
 parser.add_argument('--reward_net_path', default='', help="name and location for learned model params")
 parser.add_argument('--seed', default=0, help="random seed for experiments")
-parser.add_argument('--models_dir', default = ".", help="top directory where checkpoint models for demos are stored")
+# parser.add_argument('--models_dir', default = ".", help="top directory where checkpoint models for demos are stored")
 parser.add_argument('--save_fig_dir', help ="where to save visualizations")
-parser.add_argument('--data_dir', default='../../learning-rewards-of-learners/data/atari-head/', help='path to data directory with demonstrations')
+parser.add_argument('--data_dir', default='../../atari-head/', help='path to data directory with demonstrations')
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # Assume that we are on a CUDA machine, then this should print a CUDA device:
@@ -111,9 +111,15 @@ class Net(nn.Module):
         return torch.cat([cum_r_i, cum_r_j]), abs_r_i + abs_r_j
 '''
 
-reward = Net(gaze_dropout=False, gaze_loss_type=None)
-reward.load_state_dict(torch.load(reward_net_path))
+if torch.cuda.is_available():
+    map_location=lambda storage, loc: storage.cuda()
+else:
+    map_location='cpu'
+print(map_location, device)
+reward = Net(gaze_loss_type=None)
 reward.to(device)
+reward.load_state_dict(torch.load(reward_net_path,map_location=map_location))
+
 
 
 
@@ -264,12 +270,12 @@ for checkpoint in checkpoints_extrapolate:
 env.close()
 
 '''
-import utils
-import atari_head_dataset as ahd
+from gaze import human_utils
+from gaze import atari_head_dataset as ahd
 # get real human demos
 
 dataset = ahd.AtariHeadDataset(args.env_name, args.data_dir)
-demonstrations, learning_returns, learning_rewards, learning_gaze = utils.get_preprocessed_trajectories(env_name, dataset, args.data_dir, use_gaze=False, gaze_conv_layer=0, use_motion=False)
+demonstrations, learning_returns, learning_rewards = human_utils.get_preprocessed_trajectories(env_name, dataset, args.data_dir)
 
 
 
@@ -322,16 +328,23 @@ with torch.no_grad():
     for d in demonstrations:
         print(cnt)
         cnt += 1
+
+        # print('len(d):',len(d))
         for i,s in enumerate(d[2:-1]):
-            r = reward.cum_return(torch.from_numpy(np.array([s])).float().to(device))[0].item()
+            # print('len(s):',len(s))
+            # print('len(s[0]):', len(s[0]))
+            # print(s[0])
+            # print(s[0].shape, type(s[0]))
+            r = reward.cum_return(torch.from_numpy(s[0]).float())[0].float().to(device).item()
+
             if r < min_reward:
                 min_reward = r
-                min_frame = s
+                min_frame = s[0]
                 min_frame_i = i+2
             elif r > max_reward:
                 max_reward = r
-                max_frame = s
-                print(max_frame.shape)
+                max_frame = s[0]
+                # print(max_frame.shape)
                 #exit(1)
                 max_frame_i = i+2
 
@@ -350,12 +363,12 @@ def mask_coord(i,j,frames, mask_size, channel):
 def gen_attention_maps(frames, mask_size):
 
     orig_frame = frames
-    #print(orig_frame.shape)
+    # print(orig_frame.shape)
     #okay so I want to vizualize what makes these better or worse.
-    height,width,channels = orig_frame.shape
+    batch,height,width,channels = orig_frame.shape
 
     #find reward without any masking once
-    r_before = reward.cum_return(torch.from_numpy(np.array([orig_frame])).float().to(device))[0].item()
+    r_before = reward.cum_return(torch.from_numpy(orig_frame).float())[0].float().to(device).item()
     heat_maps = []
     for c in range(4): #four stacked frame channels
         delta_heat = np.zeros((height, width))
@@ -363,7 +376,7 @@ def gen_attention_maps(frames, mask_size):
             for j in range(width - mask_size):
                 #get masked frames
                 masked_ij = mask_coord(i,j,orig_frame, mask_size, c)
-                r_after = r = reward.cum_return(torch.from_numpy(np.array([masked_ij])).float().to(device))[0].item()
+                r_after = r = reward.cum_return(torch.from_numpy(masked_ij).float())[0].float().to(device).item()
                 r_delta = abs(r_after - r_before)
                 #save to heatmap
                 delta_heat[i:i+mask_size, j:j+mask_size] += r_delta
@@ -426,11 +439,11 @@ plt.savefig(save_fig_dir + "/" + env_name + "min_frames.png", bbox_inches='tight
 #random frame heatmap
 d_rand = np.random.randint(len(demonstrations))
 f_rand = np.random.randint(len(demonstrations[d_rand]))
-rand_frames = demonstrations[d_rand][f_rand]
-
+rand_frames = demonstrations[d_rand][f_rand][0]
+print(rand_frames)
 
 # In[55]:
-
+# print(rand_frames)
 plt.figure(9)
 for cnt in range(4):
     plt.subplot(1,4,cnt+1)
