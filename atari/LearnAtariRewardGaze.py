@@ -145,7 +145,8 @@ def create_training_data(demonstrations, num_trajs, num_snippets, min_snippet_le
             label = 0
         else:
             label = 1
-        training_obs.append((traj_i, traj_j))
+        # TODO: check scores being masked here
+        training_obs.append((mask_scores(traj_i), mask_scores(traj_j)))
         training_labels.append(label)
         if use_gaze:
             training_gaze.append((gaze_i, gaze_j))
@@ -353,15 +354,15 @@ if __name__=="__main__":
     gaze_conv_layer = args.gaze_conv_layer
     print('*************** GAZE: ',use_gaze,'****************')
 
-    env = make_vec_env(env_id, 'atari', 1, seed,
-                       wrapper_kwargs={
-                           'clip_rewards':False,
-                           'episode_life':False,
-                       })
+    # env = make_vec_env(env_id, 'atari', 1, seed,
+    #                    wrapper_kwargs={
+    #                        'clip_rewards':False,
+    #                        'episode_life':False,
+    #                    })
 
 
-    env = VecFrameStack(env, 4)
-    agent = PPO2Agent(env, env_type, stochastic)
+    # env = VecFrameStack(env, 4)
+    # agent = PPO2Agent(env, env_type, stochastic)
 
     # demonstrations, learning_returns, learning_rewards = generate_novice_demos(env, env_name, agent, args.models_dir)
     # Use Atari-HEAD human demos
