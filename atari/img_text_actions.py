@@ -50,8 +50,8 @@ def confound(data_dir, dest_dir):
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description=None)
-    parser.add_argument('--data_dir', default='./test_data/asterix/', help="test images")
-    parser.add_argument('--dest_dir', default='./test_data/asterix_confounded/', help="test images")
+    parser.add_argument('--data_dir', default='./test_data/asterix/', help="folder to load test images")
+    parser.add_argument('--dest_dir', default='./test_data/asterix_confounded/', help="path to save confounded images")
 
     args = parser.parse_args()
 
