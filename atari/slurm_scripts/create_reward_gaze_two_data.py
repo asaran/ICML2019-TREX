@@ -31,5 +31,5 @@ for game in env_names:
             f.write("#SBATCH --cpus-per-task=8\n")
 
             
-            f.write("python LearnAtariRewardGaze.py --env_name "+game+" --data_dir ../../atari-head-two/ --gaze_loss KL --reward_model_path "+d+" --seed "+seed+" --gaze_reg "+weight)
+            f.write("python LearnAtariRewardGaze.py --env_name "+game+" --data_dir ../../atari-head-two/ --gaze_loss KL --reward_model_path "+d+" --seed "+seed+" --gaze_reg "+weight+" --two_demos")
             #f.write("python LearnAtariRewardGaze.py --env_name "+game+" --data_dir ../../atari-head/--reward_model_path "+d+" --seed "+seed)

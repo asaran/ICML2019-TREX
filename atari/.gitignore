@@ -27,12 +27,9 @@ eval_beforeIJCAI/*
 path_to_logs_beforeIJCAI/*
 ppo_ckpts/*
 slurm_scripts/tmp/*
-<<<<<<< HEAD
 reward_models/*
-=======
 _tb/*
 ppo_models/*
 reward_models_AAAI2020/*
 slurm_scripts/gaze_pred/*
-gaze/pretrained_models/gaze_models/*
->>>>>>> 268545b643872a08342b49fec85d3609d008c4ef
+gaze/pretrained_models/*
