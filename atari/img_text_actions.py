@@ -108,10 +108,10 @@ def confound(data_dir, dest_dir, mask, env):
             row = f.read()
 
             if i%16==0 and i>16:
-                
-                row = rows[i+1].split(',')
-                curr_action = row[5]
-                action = curr_action
+                if ',' in rows[i+1]:
+                    row = rows[i+1].split(',')
+                    curr_action = row[5]
+                    action = curr_action
             
             if mask:
                 scale = int(np.ceil(img.shape[0]/84.0))
