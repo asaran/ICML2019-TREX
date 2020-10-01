@@ -33,4 +33,4 @@ for game in env_names:
 
             
             #f.write("python LearnAtariRewardGaze.py --env_name "+game+" --data_dir ../../atari-head/ --gaze_loss KL --reward_model_path "+d+" --seed "+seed+" --gaze_reg "+weight)
-            f.write("python LearnAtariRewardGaze.py --env_name "+game+" --data_dir ../../atari-head-two/ --reward_model_path "+d+" --seed "+seed)
+            f.write("python LearnAtariRewardGaze.py --env_name "+game+" --data_dir ../../atari-head-two/ --reward_model_path "+d+" --seed "+seed+" --two_demos")

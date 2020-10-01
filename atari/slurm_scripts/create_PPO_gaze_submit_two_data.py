@@ -6,7 +6,7 @@ env_names = [['alien','Alien'],['asterix','Asterix'],['bank_heist','BankHeist'],
 seeds = ['0']#,'1','2']
 #conv_layer = '' #'1'
 #user_type = 'expert'
-gaze_loss_type = 'KL_two'
+gaze_loss_type = 'KL'
 #gaze_reg = '0.01'
 weights = ['0.001','0.005','0.01','0.05','0.1','0.3','0.5','0.7','0.9']
 
@@ -37,7 +37,7 @@ for env in env_names:
       f.write("#SBATCH --error=logs/slurmjob_%j.err\n")
       f.write("#SBATCH --mail-user=asaran@cs.utexas.edu\n")
       f.write("#SBATCH --mail-type=END,FAIL,REQUEUE\n")
-      f.write("#SBATCH --partition dgx\n")
+      f.write("#SBATCH --partition titans\n")
       f.write("#SBATCH --nodes=1\n")
       f.write("#SBATCH --ntasks-per-node=1\n")
       f.write("#SBATCH --time 84:00:00\n") 
@@ -45,7 +45,7 @@ for env in env_names:
       f.write("#SBATCH --mem=50G\n")
       f.write("#SBATCH --cpus-per-task=8\n")
              
-      f.write("OPENAI_LOG_FORMAT='stdout,log,csv,tensorboard' OPENAI_LOGDIR=ppo_models/"+gaze_loss_type+"/"+env[0]+"_"+gaze_loss_type+"_"+weight+'_seed'+seed+" python -m baselines.run --alg=ppo2 --env="+env[1]+"NoFrameskip-v4 --custom_reward pytorch --custom_reward_path reward_models_AAAI2020/gazePred_"+env[0]+"_KL_"+weight+'_seed'+seed+"_two-data"+" --seed "+seed+" --num_timesteps=5e7 --save_interval=500 --num_env 9\n")
+      f.write("OPENAI_LOG_FORMAT='stdout,log,csv,tensorboard' OPENAI_LOGDIR=ppo_models/"+gaze_loss_type+"_two/"+env[0]+"_"+gaze_loss_type+"_"+weight+'_seed'+seed+" python -m baselines.run --alg=ppo2 --env="+env[1]+"NoFrameskip-v4 --custom_reward pytorch --custom_reward_path reward_models_AAAI2020/gazePred_"+env[0]+"_KL_"+weight+'_seed'+seed+"_two-data"+" --seed "+seed+" --num_timesteps=5e7 --save_interval=500 --num_env 9\n")
     
       i+=1
       
